@@ -1,0 +1,21 @@
+#include <WiFi.h>
+#include <WiFiUdp.h>
+
+char nmea[] = "$GPRMC,120000.03,A,3905.84900,N,02633.42800,E,0000.0,330.0,011019,0.0,W,A,S*60";
+WiFiUDP udp;
+IPAddress udp_ip(192,168,4,255);
+
+void setup() {
+  WiFi.softAP("TEST_NETWORK", "12345678");
+  udp.begin(2000);
+}
+
+void loop() {
+  udp.beginPacket(udp_ip, 2000 );
+  udp.println( nmea );
+  udp.endPacket();
+  delay(100);
+}
+
+
+https://stackoverflow.com/questions/59729166/asyncudp-example-on-two-esp32s-not-working-wl-no-ssid-avail
