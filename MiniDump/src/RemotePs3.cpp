@@ -98,22 +98,39 @@ void RemotePs3::update(byte* data, byte len)
     // Not active so we skip event handling 
     if(!_isDeviceActive) return;
 
-    if(last_state.part.btn_ps == false && cur_state.part.btn_ps == true && _callback_ps) _callback_ps();
-    if(last_state.part.btn_start == false && cur_state.part.btn_start == true && _callback_start) _callback_start();
-    if(last_state.part.btn_select == false && cur_state.part.btn_select == true && _callback_select) _callback_select();
+    if(last_state.part.btn_ps == false && cur_state.part.btn_ps == true && _callback_ps) _callback_ps(true);
+    if(last_state.part.btn_start == false && cur_state.part.btn_start == true && _callback_start) _callback_start(true);
+    if(last_state.part.btn_select == false && cur_state.part.btn_select == true && _callback_select) _callback_select(true);
 
-    if(last_state.part.btn_dpad_up == false && cur_state.part.btn_dpad_up == true && _callback_dpadup) _callback_dpadup();
-    if(last_state.part.btn_dpad_down == false && cur_state.part.btn_dpad_down == true && _callback_dpaddown) _callback_dpaddown();
-    if(last_state.part.btn_dpad_left == false && cur_state.part.btn_dpad_left == true && _callback_dpadleft) _callback_dpadleft();
-    if(last_state.part.btn_dpad_right == false && cur_state.part.btn_dpad_right == true && _callback_dpadright) _callback_dpadright();
+    if(last_state.part.btn_dpad_up == false && cur_state.part.btn_dpad_up == true && _callback_dpadup) _callback_dpadup(true);
+    if(last_state.part.btn_dpad_down == false && cur_state.part.btn_dpad_down == true && _callback_dpaddown) _callback_dpaddown(true);
+    if(last_state.part.btn_dpad_left == false && cur_state.part.btn_dpad_left == true && _callback_dpadleft) _callback_dpadleft(true);
+    if(last_state.part.btn_dpad_right == false && cur_state.part.btn_dpad_right == true && _callback_dpadright) _callback_dpadright(true);
 
-    if(last_state.part.btn_cross == false && cur_state.part.btn_cross == true && _callback_cross) _callback_cross();
-    if(last_state.part.btn_circle == false && cur_state.part.btn_circle == true && _callback_circle) _callback_circle();
-    if(last_state.part.btn_square == false && cur_state.part.btn_square == true && _callback_square) _callback_square();
-    if(last_state.part.btn_triangle == false && cur_state.part.btn_triangle == true && _callback_triangle) _callback_triangle();
+    if(last_state.part.btn_cross == false && cur_state.part.btn_cross == true && _callback_cross) _callback_cross(true);
+    if(last_state.part.btn_circle == false && cur_state.part.btn_circle == true && _callback_circle) _callback_circle(true);
+    if(last_state.part.btn_square == false && cur_state.part.btn_square == true && _callback_square) _callback_square(true);
+    if(last_state.part.btn_triangle == false && cur_state.part.btn_triangle == true && _callback_triangle) _callback_triangle(true);
 
-    if(last_state.part.btn_left_stick == false && cur_state.part.btn_left_stick == true && _callback_leftstick) _callback_leftstick();
-    if(last_state.part.btn_right_stick == false && cur_state.part.btn_right_stick == true && _callback_rightstick) _callback_rightstick();
+    if(last_state.part.btn_left_stick == false && cur_state.part.btn_left_stick == true && _callback_leftstick) _callback_leftstick(true);
+    if(last_state.part.btn_right_stick == false && cur_state.part.btn_right_stick == true && _callback_rightstick) _callback_rightstick(true);
+
+    if(last_state.part.btn_ps == true && cur_state.part.btn_ps == false && _callback_ps) _callback_ps(false);
+    if(last_state.part.btn_start == true && cur_state.part.btn_start == false && _callback_start) _callback_start(false);
+    if(last_state.part.btn_select == true && cur_state.part.btn_select == false && _callback_select) _callback_select(false);
+
+    if(last_state.part.btn_dpad_up == true && cur_state.part.btn_dpad_up == false && _callback_dpadup) _callback_dpadup(false);
+    if(last_state.part.btn_dpad_down == true && cur_state.part.btn_dpad_down == false && _callback_dpaddown) _callback_dpaddown(false);
+    if(last_state.part.btn_dpad_left == true && cur_state.part.btn_dpad_left == false && _callback_dpadleft) _callback_dpadleft(false);
+    if(last_state.part.btn_dpad_right == true && cur_state.part.btn_dpad_right == false && _callback_dpadright) _callback_dpadright(false);
+
+    if(last_state.part.btn_cross == true && cur_state.part.btn_cross == false && _callback_cross) _callback_cross(false);
+    if(last_state.part.btn_circle == true && cur_state.part.btn_circle == false && _callback_circle) _callback_circle(false);
+    if(last_state.part.btn_square == true && cur_state.part.btn_square == false && _callback_square) _callback_square(false);
+    if(last_state.part.btn_triangle == true && cur_state.part.btn_triangle == false && _callback_triangle) _callback_triangle(false);
+
+    if(last_state.part.btn_left_stick == true && cur_state.part.btn_left_stick == false && _callback_leftstick) _callback_leftstick(false);
+    if(last_state.part.btn_right_stick == true && cur_state.part.btn_right_stick == false && _callback_rightstick) _callback_rightstick(false);
 
     if(_callback_update) _callback_update();
 }
@@ -123,31 +140,31 @@ void RemotePs3::swap()
     memcpy(last_state.data,cur_state.data,10);
 }
 
-void RemotePs3::onUpdate(callbackPS_t value) { _callback_update = value; } 
+void RemotePs3::onUpdate(callbackVoid_t value) { _callback_update = value; } 
 
-void RemotePs3::onSwitchToInactive(callbackPS_t value) { _callback_goingInactive = value; }
-void RemotePs3::onSwitchToActive(callbackPS_t value) { _callback_goingActive = value; }
+void RemotePs3::onSwitchToInactive(callbackVoid_t value) { _callback_goingInactive = value; }
+void RemotePs3::onSwitchToActive(callbackVoid_t value) { _callback_goingActive = value; }
 
-void RemotePs3::onRegistrationStart(callbackPS_t value) { _callback_startRegistration = value; }
-void RemotePs3::onRegistrationDone(callbackPS_t value) { _callback_doneRegistration = value; }
+void RemotePs3::onRegistrationStart(callbackVoid_t value) { _callback_startRegistration = value; }
+void RemotePs3::onRegistrationDone(callbackVoid_t value) { _callback_doneRegistration = value; }
 
 
-void RemotePs3::onBtnDpadUpDown(callbackPS_t value) { _callback_dpadup = value; }
-void RemotePs3::onBtnDpadDownDown(callbackPS_t value) { _callback_dpaddown = value; }
-void RemotePs3::onBtnDpadLeftDown(callbackPS_t value) { _callback_dpadleft = value; }
-void RemotePs3::onBtnDpadRightDown(callbackPS_t value) { _callback_dpadright = value; }
+void RemotePs3::onBtnDpadUpEvent(callbackPressed_t value) { _callback_dpadup = value; }
+void RemotePs3::onBtnDpadDownEvent(callbackPressed_t value) { _callback_dpaddown = value; }
+void RemotePs3::onBtnDpadLeftEvent(callbackPressed_t value) { _callback_dpadleft = value; }
+void RemotePs3::onBtnDpadRightEvent(callbackPressed_t value) { _callback_dpadright = value; }
 
-void RemotePs3::onBtnCrossDown(callbackPS_t value) { _callback_cross = value; }
-void RemotePs3::onBtnCircleDown(callbackPS_t value) { _callback_circle = value; }
-void RemotePs3::onBtnSquareDown(callbackPS_t value) { _callback_square = value; }
-void RemotePs3::onBtnTriangleDown(callbackPS_t value) { _callback_triangle = value; }
+void RemotePs3::onBtnCrossEvent(callbackPressed_t value) { _callback_cross = value; }
+void RemotePs3::onBtnCircleEvent(callbackPressed_t value) { _callback_circle = value; }
+void RemotePs3::onBtnSquareEvent(callbackPressed_t value) { _callback_square = value; }
+void RemotePs3::onBtnTriangleEvent(callbackPressed_t value) { _callback_triangle = value; }
 
-void RemotePs3::onBtnLeftStickDown(callbackPS_t value) { _callback_leftstick = value; }
-void RemotePs3::onBtnRightStickDown(callbackPS_t value) { _callback_rightstick = value; }
+void RemotePs3::onBtnLeftStickEvent(callbackPressed_t value) { _callback_leftstick = value; }
+void RemotePs3::onBtnRightStickEvent(callbackPressed_t value) { _callback_rightstick = value; }
 
-void RemotePs3::onBtnSelectDown(callbackPS_t value) { _callback_select = value; }
-void RemotePs3::onBtnPsDown(callbackPS_t value) { _callback_ps = value; }
-void RemotePs3::onBtnStartDown(callbackPS_t value) { _callback_start = value; }
+void RemotePs3::onBtnSelectEvent(callbackPressed_t value) { _callback_select = value; }
+void RemotePs3::onBtnPsEvent(callbackPressed_t value) { _callback_ps = value; }
+void RemotePs3::onBtnStartEvent(callbackPressed_t value) { _callback_start = value; }
 
 int8_t RemotePs3::getLeftStickX() { return cur_state.part.analog_lx; }
 int8_t RemotePs3::getLeftStickY() { return cur_state.part.analog_ly; }

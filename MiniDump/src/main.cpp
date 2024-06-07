@@ -108,9 +108,10 @@ void devGoingInactive()
   switchLights(false);
 }
 
-void ctrlDpadUp()
+void ctrlDpadUp(bool pressed)
 {
-  switchLights(lightsOff);
+  if(pressed)
+    switchLights(lightsOff);
 }
 
 void ctrlUpdate()
@@ -159,7 +160,7 @@ void setup() {
   controller.onSwitchToActive(devGoingActive);
   controller.onSwitchToInactive(devGoingInactive);
   controller.onUpdate(ctrlUpdate);
-  controller.onBtnDpadUpDown(ctrlDpadUp);
+  controller.onBtnDpadUpEvent(ctrlDpadUp);
   controller.onRegistrationStart(registrationStart);
   controller.onRegistrationDone(registrationDone);
 

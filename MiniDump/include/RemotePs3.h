@@ -56,7 +56,8 @@ union transmit
 
 class RemotePs3 {
 public:
-    typedef void(*callbackPS_t)();
+    typedef void(*callbackVoid_t)();
+    typedef void(*callbackPressed_t)(bool pressed);
     
     
     RemotePs3(byte devicenum);
@@ -64,22 +65,22 @@ public:
     void begin();
 
     bool isDeviceActive();
-    void onBtnDpadUpDown(callbackPS_t value);
-    void onBtnDpadDownDown(callbackPS_t value);
-    void onBtnDpadLeftDown(callbackPS_t value);
-    void onBtnDpadRightDown(callbackPS_t value);
+    void onBtnDpadUpEvent(callbackPressed_t value);
+    void onBtnDpadDownEvent(callbackPressed_t value);
+    void onBtnDpadLeftEvent(callbackPressed_t value);
+    void onBtnDpadRightEvent(callbackPressed_t value);
 
-    void onBtnCrossDown(callbackPS_t value);
-    void onBtnCircleDown(callbackPS_t value);
-    void onBtnSquareDown(callbackPS_t value);
-    void onBtnTriangleDown(callbackPS_t value);
+    void onBtnCrossEvent(callbackPressed_t value);
+    void onBtnCircleEvent(callbackPressed_t value);
+    void onBtnSquareEvent(callbackPressed_t value);
+    void onBtnTriangleEvent(callbackPressed_t value);
 
-    void onBtnLeftStickDown(callbackPS_t value);
-    void onBtnRightStickDown(callbackPS_t value);
+    void onBtnLeftStickEvent(callbackPressed_t value);
+    void onBtnRightStickEvent(callbackPressed_t value);
 
-    void onBtnSelectDown(callbackPS_t value);
-    void onBtnPsDown(callbackPS_t value);
-    void onBtnStartDown(callbackPS_t value);
+    void onBtnSelectEvent(callbackPressed_t value);
+    void onBtnPsEvent(callbackPressed_t value);
+    void onBtnStartEvent(callbackPressed_t value);
    
     // Returns values between -127 and 127
     int8_t getLeftStickX();
@@ -95,11 +96,11 @@ public:
     uint8_t getL2();
     uint8_t getR2();
    
-    void onUpdate(callbackPS_t value);
-    void onSwitchToInactive(callbackPS_t value);
-    void onSwitchToActive(callbackPS_t value);
-    void onRegistrationStart(callbackPS_t value);
-    void onRegistrationDone(callbackPS_t value);
+    void onUpdate(callbackVoid_t value);
+    void onSwitchToInactive(callbackVoid_t value);
+    void onSwitchToActive(callbackVoid_t value);
+    void onRegistrationStart(callbackVoid_t value);
+    void onRegistrationDone(callbackVoid_t value);
 
 
     // dont use it
@@ -125,29 +126,29 @@ private:
     int clientport = 12346;
     IPAddress serverAddr;
 
-    callbackPS_t _callback_goingActive = nullptr;
-    callbackPS_t _callback_goingInactive = nullptr;
-    callbackPS_t _callback_startRegistration = nullptr;
-    callbackPS_t _callback_doneRegistration = nullptr;
+    callbackVoid_t _callback_goingActive = nullptr;
+    callbackVoid_t _callback_goingInactive = nullptr;
+    callbackVoid_t _callback_startRegistration = nullptr;
+    callbackVoid_t _callback_doneRegistration = nullptr;
 
-    callbackPS_t _callback_update = nullptr;
+    callbackVoid_t _callback_update = nullptr;
 
-    callbackPS_t _callback_dpadup = nullptr;
-    callbackPS_t _callback_dpaddown = nullptr;
-    callbackPS_t _callback_dpadleft = nullptr;
-    callbackPS_t _callback_dpadright = nullptr;
+    callbackPressed_t _callback_dpadup = nullptr;
+    callbackPressed_t _callback_dpaddown = nullptr;
+    callbackPressed_t _callback_dpadleft = nullptr;
+    callbackPressed_t _callback_dpadright = nullptr;
 
-    callbackPS_t _callback_cross = nullptr;
-    callbackPS_t _callback_circle = nullptr;
-    callbackPS_t _callback_square = nullptr;
-    callbackPS_t _callback_triangle = nullptr;
+    callbackPressed_t _callback_cross = nullptr;
+    callbackPressed_t _callback_circle = nullptr;
+    callbackPressed_t _callback_square = nullptr;
+    callbackPressed_t _callback_triangle = nullptr;
 
-    callbackPS_t _callback_select = nullptr;
-    callbackPS_t _callback_ps = nullptr;
-    callbackPS_t _callback_start = nullptr;
+    callbackPressed_t _callback_select = nullptr;
+    callbackPressed_t _callback_ps = nullptr;
+    callbackPressed_t _callback_start = nullptr;
 
-    callbackPS_t _callback_leftstick = nullptr;
-    callbackPS_t _callback_rightstick = nullptr;
+    callbackPressed_t _callback_leftstick = nullptr;
+    callbackPressed_t _callback_rightstick = nullptr;
 };
 
 #endif
