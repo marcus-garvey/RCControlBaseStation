@@ -8,7 +8,7 @@
 #define TXD2 17
 
 transmit controller_state;
-int update_interval = 40;
+int update_interval = 20;
 
 int encodedLen = 0;
 int dataLen = 10;
@@ -52,6 +52,14 @@ void updateState(transmit& state)
 void onPS3Notify()
 {
     updateState(controller_state);
+
+    char encodedString[encodedLen + 1];
+    Base64.encode(encodedString, controller_state.data, dataLen);
+
+    Serial2.write(0);
+    Serial2.write(encodedLen);
+    Serial2.write(encodedString,encodedLen);
+    Serial2.flush();
 }
 
 void onPS3Connect(){
@@ -68,7 +76,7 @@ void onPS3Disconnect()
 void setup()
 {
     Serial.begin(115200);
-    Serial2.begin(38400, SERIAL_8N1, RXD2, TXD2);
+    Serial2.begin(115200, SERIAL_8N1, RXD2, TXD2);
     Ps3.attach(onPS3Notify);
     Ps3.attachOnConnect(onPS3Connect);
     Ps3.attachOnDisconnect(onPS3Disconnect);
@@ -99,7 +107,7 @@ void loop()
         Serial.println(temp[0], DEC);
     }
 
-
+/*
     if((millis() - lastTime) > update_interval)
     {
         char encodedString[encodedLen + 1];
@@ -113,7 +121,7 @@ void loop()
         //Serial.println();
         lastTime = millis();
     }
-    
+*/    
 }
 
 
