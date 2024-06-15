@@ -374,6 +374,46 @@ void onStickRY(int state)
 
 void ctrlUpdate()
 {
+if (moveClawServoUp) {
+    if (servoDelay == 3) {
+      if (clawServoValue >= 10 && clawServoValue < 170) {
+        clawServoValue = clawServoValue + 1;
+        clawServo.write(clawServoValue);
+      }
+      servoDelay = 0;
+    }
+    servoDelay++;
+  }
+  if (moveClawServoDown) {
+    if (servoDelay == 3) {
+      if (clawServoValue <= 170 && clawServoValue > 10) {
+        clawServoValue = clawServoValue - 1;
+        clawServo.write(clawServoValue);
+      }
+      servoDelay = 0;
+    }
+    servoDelay++;
+  }
+  if (moveAuxServoUp) {
+    if (servoDelay == 3) {
+      if (auxServoValue >= 10 && auxServoValue < 170) {
+        auxServoValue = auxServoValue + 1;
+        auxServo.write(auxServoValue);
+      }
+      servoDelay = 0;
+    }
+    servoDelay++;
+  }
+  if (moveAuxServoDown) {
+    if (servoDelay == 3) {
+      if (auxServoValue <= 170 && auxServoValue > 10) {
+        auxServoValue = auxServoValue - 1;
+        auxServo.write(auxServoValue);
+      }
+      servoDelay = 0;
+    }
+    servoDelay++;
+  }
 
 }
 
@@ -467,46 +507,6 @@ void setup() {
 void loop() {
   // put your main code here, to run repeatedly:
 
-  if (moveClawServoUp) {
-    if (servoDelay == 3) {
-      if (clawServoValue >= 10 && clawServoValue < 170) {
-        clawServoValue = clawServoValue + 1;
-        clawServo.write(clawServoValue);
-      }
-      servoDelay = 0;
-    }
-    servoDelay++;
-  }
-  if (moveClawServoDown) {
-    if (servoDelay == 3) {
-      if (clawServoValue <= 170 && clawServoValue > 10) {
-        clawServoValue = clawServoValue - 1;
-        clawServo.write(clawServoValue);
-      }
-      servoDelay = 0;
-    }
-    servoDelay++;
-  }
-  if (moveAuxServoUp) {
-    if (servoDelay == 3) {
-      if (auxServoValue >= 10 && auxServoValue < 170) {
-        auxServoValue = auxServoValue + 1;
-        auxServo.write(auxServoValue);
-      }
-      servoDelay = 0;
-    }
-    servoDelay++;
-  }
-  if (moveAuxServoDown) {
-    if (servoDelay == 3) {
-      if (auxServoValue <= 170 && auxServoValue > 10) {
-        auxServoValue = auxServoValue - 1;
-        auxServo.write(auxServoValue);
-      }
-      servoDelay = 0;
-    }
-    servoDelay++;
-  }
-
+  
 }
 
