@@ -4,4 +4,11 @@ This project implements a RC base station for the printable RC models from [Prof
 
 ![diagram](Image/Diagram.jpeg)
 
+# Setup Brain MCU
+Wire two Nodemcu like this
+![schematic](Image/Schematic.png)
+
+In the BaseStationBrainPS project you must setup the PS3 controller mac address.
+Upload BaseStationBrainPS to the first Nodemcu and the BaseStationBrainWIFI project to the second Nodemcu. 
+
 [GithubProfBoots]: https://github.com/ProfBoots
