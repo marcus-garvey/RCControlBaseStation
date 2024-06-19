@@ -50,7 +50,9 @@ bool moveClawServoUp = false;
 bool moveClawServoDown = false;
 bool moveAuxServoUp = false;
 bool moveAuxServoDown = false;
-
+int moveServoInterval = 20;
+long lastClawServoMove = 0;
+long lastAuxServoMove = 0;
 #define MCU_LED 2
 #define DEVICE_NUM 2
 RemotePs3 controller(DEVICE_NUM);
@@ -374,47 +376,7 @@ void onStickRY(int state)
 
 void ctrlUpdate()
 {
-if (moveClawServoUp) {
-    if (servoDelay == 3) {
-      if (clawServoValue >= 10 && clawServoValue < 170) {
-        clawServoValue = clawServoValue + 1;
-        clawServo.write(clawServoValue);
-      }
-      servoDelay = 0;
-    }
-    servoDelay++;
-  }
-  if (moveClawServoDown) {
-    if (servoDelay == 3) {
-      if (clawServoValue <= 170 && clawServoValue > 10) {
-        clawServoValue = clawServoValue - 1;
-        clawServo.write(clawServoValue);
-      }
-      servoDelay = 0;
-    }
-    servoDelay++;
-  }
-  if (moveAuxServoUp) {
-    if (servoDelay == 3) {
-      if (auxServoValue >= 10 && auxServoValue < 170) {
-        auxServoValue = auxServoValue + 1;
-        auxServo.write(auxServoValue);
-      }
-      servoDelay = 0;
-    }
-    servoDelay++;
-  }
-  if (moveAuxServoDown) {
-    if (servoDelay == 3) {
-      if (auxServoValue <= 170 && auxServoValue > 10) {
-        auxServoValue = auxServoValue - 1;
-        auxServo.write(auxServoValue);
-      }
-      servoDelay = 0;
-    }
-    servoDelay++;
-  }
-
+  
 }
 
 void devGoingActive()
@@ -506,7 +468,39 @@ void setup() {
 
 void loop() {
   // put your main code here, to run repeatedly:
+  if(moveClawServoUp || moveClawServoDown)
+  {
+    if((millis() - lastClawServoMove) > moveServoInterval)
+    { 
+      if(moveClawServoUp && clawServoValue < 170)
+      {
+        clawServoValue++;
+      }
+      else if(moveClawServoDown && clawServoValue > 10)
+      {
+        clawServoValue--;
+      }
+      clawServo.write(clawServoValue);
+      lastClawServoMove = millis();
+    }
+  }
 
+  if(moveAuxServoUp || moveAuxServoDown)
+  {
+    if((millis() - lastAuxServoMove) > moveServoInterval)
+    { 
+      if(moveAuxServoUp && auxServoValue < 170)
+      {
+        auxServoValue++;
+      }
+      else if(moveAuxServoDown && auxServoValue > 10)
+      {
+        auxServoValue--;
+      }
+      auxServo.write(auxServoValue);
+      lastAuxServoMove = millis();
+    }
+  }
   
 }
 

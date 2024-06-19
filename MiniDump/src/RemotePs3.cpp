@@ -132,6 +132,45 @@ void RemotePs3::update(byte* data, byte len)
     if(last_state.part.btn_left_stick == true && cur_state.part.btn_left_stick == false && _callback_leftstick) _callback_leftstick(false);
     if(last_state.part.btn_right_stick == true && cur_state.part.btn_right_stick == false && _callback_rightstick) _callback_rightstick(false);
 
+    if(last_state.part.analog_l1 <= analogBtnEventThreshold && cur_state.part.analog_l1 > analogBtnEventThreshold && _callback_l1 ) _callback_l1(true);
+    if(last_state.part.analog_l2 <= analogBtnEventThreshold && cur_state.part.analog_l2 > analogBtnEventThreshold && _callback_l2 ) _callback_l2(true);
+    if(last_state.part.analog_r1 <= analogBtnEventThreshold && cur_state.part.analog_r1 > analogBtnEventThreshold && _callback_r1 ) _callback_r1(true);
+    if(last_state.part.analog_r2 <= analogBtnEventThreshold && cur_state.part.analog_r2 > analogBtnEventThreshold && _callback_r2 ) _callback_r2(true);
+
+    if(last_state.part.analog_l1 > analogBtnEventThreshold && cur_state.part.analog_l1 <= analogBtnEventThreshold && _callback_l1 ) _callback_l1(false);
+    if(last_state.part.analog_l2 > analogBtnEventThreshold && cur_state.part.analog_l2 <= analogBtnEventThreshold && _callback_l2 ) _callback_l2(false);
+    if(last_state.part.analog_r1 > analogBtnEventThreshold && cur_state.part.analog_r1 <= analogBtnEventThreshold && _callback_r1 ) _callback_r1(false);
+    if(last_state.part.analog_r2 > analogBtnEventThreshold && cur_state.part.analog_r2 <= analogBtnEventThreshold && _callback_r2 ) _callback_r2(false);
+
+
+    if(last_state.part.analog_lx <= analogThresholdHighLX && cur_state.part.analog_lx > analogThresholdHighLX && _callback_LX) _callback_LX(1);
+    if(last_state.part.analog_lx >= (-1 * analogThresholdHighLX) && cur_state.part.analog_lx < (-1 * analogThresholdHighLX) && _callback_LX) _callback_LX(-1);
+
+    if(((last_state.part.analog_lx > analogThresholdLowLX && cur_state.part.analog_lx <= analogThresholdLowLX) ||
+        (last_state.part.analog_lx < (-1 * analogThresholdLowLX) && cur_state.part.analog_lx >= (-1 * analogThresholdLowLX)))
+        && _callback_LX) _callback_LX(0);
+
+    if(last_state.part.analog_ly <= analogThresholdHighLY && cur_state.part.analog_ly > analogThresholdHighLY && _callback_LY) _callback_LY(1);
+    if(last_state.part.analog_ly >= (-1 * analogThresholdHighLY) && cur_state.part.analog_ly < (-1 * analogThresholdHighLY) && _callback_LY) _callback_LY(-1);
+
+    if(((last_state.part.analog_ly > analogThresholdLowLY && cur_state.part.analog_ly <= analogThresholdLowLY) ||
+        (last_state.part.analog_ly < (-1 * analogThresholdLowLY) && cur_state.part.analog_ly >= (-1 * analogThresholdLowLY)))
+        && _callback_LY) _callback_LY(0);
+
+    if(last_state.part.analog_rx <= analogThresholdHighRX && cur_state.part.analog_rx > analogThresholdHighRX && _callback_RX) _callback_RX(1);
+    if(last_state.part.analog_rx >= (-1 * analogThresholdHighRX) && cur_state.part.analog_rx < (-1 * analogThresholdHighRX) && _callback_RX) _callback_RX(-1);
+
+    if(((last_state.part.analog_rx > analogThresholdLowRX && cur_state.part.analog_rx <= analogThresholdLowRX) ||
+        (last_state.part.analog_rx < (-1 * analogThresholdLowRX) && cur_state.part.analog_rx >= (-1 * analogThresholdLowRX)))
+        && _callback_RX) _callback_RX(0);
+
+    if(last_state.part.analog_ry <= analogThresholdHighRY && cur_state.part.analog_ry > analogThresholdHighRY && _callback_RY) _callback_RY(1);
+    if(last_state.part.analog_ry >= (-1 * analogThresholdHighRY) && cur_state.part.analog_ry < (-1 * analogThresholdHighRY) && _callback_RY) _callback_RY(-1);
+
+    if(((last_state.part.analog_ry > analogThresholdLowRY && cur_state.part.analog_ry <= analogThresholdLowRY) ||
+        (last_state.part.analog_ry < (-1 * analogThresholdLowRY) && cur_state.part.analog_ry >= (-1 * analogThresholdLowRY)))
+        && _callback_RY) _callback_RY(0);
+
     if(_callback_update) _callback_update();
 }
 
@@ -162,6 +201,12 @@ void RemotePs3::onBtnTriangleEvent(callbackPressed_t value) { _callback_triangle
 void RemotePs3::onBtnLeftStickEvent(callbackPressed_t value) { _callback_leftstick = value; }
 void RemotePs3::onBtnRightStickEvent(callbackPressed_t value) { _callback_rightstick = value; }
 
+void RemotePs3::onBtnL1Event(callbackPressed_t value) { _callback_l1 = value; }
+void RemotePs3::onBtnL2Event(callbackPressed_t value) { _callback_l2 = value; }
+
+void RemotePs3::onBtnR1Event(callbackPressed_t value) { _callback_r1 = value; }
+void RemotePs3::onBtnR2Event(callbackPressed_t value) { _callback_r2 = value; }
+
 void RemotePs3::onBtnSelectEvent(callbackPressed_t value) { _callback_select = value; }
 void RemotePs3::onBtnPsEvent(callbackPressed_t value) { _callback_ps = value; }
 void RemotePs3::onBtnStartEvent(callbackPressed_t value) { _callback_start = value; }
@@ -177,3 +222,29 @@ uint8_t RemotePs3::getL2() { return cur_state.part.analog_l2; }
 
 uint8_t RemotePs3::getR1() { return cur_state.part.analog_r1; }
 uint8_t RemotePs3::getR2() { return cur_state.part.analog_r2; }
+
+void RemotePs3::onStickLXEvent(callbackAnalogStick_t funcValue, uint8_t highThreshold, uint8_t lowThreshold)
+{
+    _callback_LX = funcValue;
+    analogThresholdHighLX = highThreshold;
+    analogThresholdLowLX = lowThreshold;
+}
+void RemotePs3::onStickLYEvent(callbackAnalogStick_t funcValue, uint8_t highThreshold, uint8_t lowThreshold)
+{
+    _callback_LY = funcValue;
+    analogThresholdHighLY = highThreshold;
+    analogThresholdLowLY = lowThreshold;
+}
+void RemotePs3::onStickRXEvent(callbackAnalogStick_t funcValue, uint8_t highThreshold, uint8_t lowThreshold)
+{
+    _callback_RX = funcValue;
+    analogThresholdHighRX = highThreshold;
+    analogThresholdLowRX = lowThreshold;
+}
+void RemotePs3::onStickRYEvent(callbackAnalogStick_t funcValue, uint8_t highThreshold, uint8_t lowThreshold)
+{
+    _callback_RY = funcValue;
+    analogThresholdHighRY = highThreshold;
+    analogThresholdLowRY = lowThreshold;
+}
+

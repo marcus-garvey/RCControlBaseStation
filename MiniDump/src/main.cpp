@@ -21,8 +21,11 @@ Servo steeringServo;
 Servo dumpServo;
 
 int dumpBedServoValue = 5;
+bool moveDumpServoUp = false;
+bool moveDumpServoDown = false;
+int moveServoInterval = 15;
+long lastDumpServoMove = 0;
 
-bool removeArmMomentum = false;
 bool lightsOff = true;
 
 RemotePs3 controller(1);
@@ -31,17 +34,6 @@ RemotePs3 controller(1);
 void steeringControl(int steeringServoValue)
 {
   steeringServo.write(steeringServoValue);
-}
-
-void dumpControl(int dumpServoValue)
-{  
-  int mappedVal = map(dumpServoValue, -127,127,-2,2);
-  dumpBedServoValue = dumpBedServoValue + mappedVal;
-  if(dumpBedServoValue < 5) dumpBedServoValue = 5;
-  if(dumpBedServoValue > 185) dumpBedServoValue = 185;
-
-  dumpServo.write(dumpBedServoValue);
-
 }
 
 //min="-255" max="255" value="0"
@@ -91,7 +83,7 @@ void setUpPinModes()
   pinMode(lightPin1, OUTPUT);
   pinMode(lightPin2, OUTPUT); 
   pinMode(MCU_LED, OUTPUT); 
-  dumpControl(5);
+  dumpServo.write(5);
   delay(50);
   steeringControl(80);
 }
@@ -114,6 +106,25 @@ void ctrlDpadUp(bool pressed)
     switchLights(lightsOff);
 }
 
+void onStickRY(int state)
+{
+  if(state > 0)
+  {
+    moveDumpServoUp = true;
+    moveDumpServoDown = false;
+  }
+  else if (state < 0)
+  {
+    moveDumpServoUp = false;
+    moveDumpServoDown = true;
+  }
+  else 
+  {
+    moveDumpServoUp = false;
+    moveDumpServoDown = false;
+  }
+}
+
 void ctrlUpdate()
 {
   int ctrlValThrottle = controller.getR2() - controller.getL2();
@@ -123,11 +134,6 @@ void ctrlUpdate()
   int mappedValSteering = map(ctrlValSteering,-127,127,112,48);
   steeringControl(mappedValSteering);
 
-  int dumpVal = controller.getRightStickY();
-  if(dumpVal > 10 || dumpVal < -10)
-  {
-    dumpControl(dumpVal);
-  }
 }
 
 void registrationStart()
@@ -163,7 +169,7 @@ void setup() {
   controller.onBtnDpadUpEvent(ctrlDpadUp);
   controller.onRegistrationStart(registrationStart);
   controller.onRegistrationDone(registrationDone);
-
+  controller.onStickRYEvent(onStickRY, 115, 30);
   controller.begin();
 
   switchLights(false);
@@ -171,7 +177,22 @@ void setup() {
 
 void loop() {
   // put your main code here, to run repeatedly:
-
+  if(moveDumpServoUp || moveDumpServoDown)
+  {
+    if((millis() - lastDumpServoMove) > moveServoInterval)
+    { 
+      if(moveDumpServoUp && dumpBedServoValue < 185)
+      {
+        dumpBedServoValue++;
+      }
+      else if(moveDumpServoDown && dumpBedServoValue > 5)
+      {
+        dumpBedServoValue--;
+      }
+      dumpServo.write(dumpBedServoValue);
+      lastDumpServoMove = millis();
+    }
+  }
 
 }
 

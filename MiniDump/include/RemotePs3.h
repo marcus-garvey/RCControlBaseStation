@@ -58,6 +58,8 @@ class RemotePs3 {
 public:
     typedef void(*callbackVoid_t)();
     typedef void(*callbackPressed_t)(bool pressed);
+    // state returns -1 or 1 if the high threshold was triggered and 0 if the low threshold was triggered
+    typedef void(*callbackAnalogStick_t)(int state);
     
     
     RemotePs3(byte devicenum);
@@ -78,10 +80,21 @@ public:
     void onBtnLeftStickEvent(callbackPressed_t value);
     void onBtnRightStickEvent(callbackPressed_t value);
 
+    void onBtnL1Event(callbackPressed_t value);
+    void onBtnL2Event(callbackPressed_t value);
+
+    void onBtnR1Event(callbackPressed_t value);
+    void onBtnR2Event(callbackPressed_t value);
+
     void onBtnSelectEvent(callbackPressed_t value);
     void onBtnPsEvent(callbackPressed_t value);
     void onBtnStartEvent(callbackPressed_t value);
    
+    void onStickLXEvent(callbackAnalogStick_t funcValue, uint8_t highThreshold, uint8_t lowThreshold);
+    void onStickLYEvent(callbackAnalogStick_t funcValue, uint8_t highThreshold, uint8_t lowThreshold);
+    void onStickRXEvent(callbackAnalogStick_t funcValue, uint8_t highThreshold, uint8_t lowThreshold);
+    void onStickRYEvent(callbackAnalogStick_t funcValue, uint8_t highThreshold, uint8_t lowThreshold);
+
     // Returns values between -127 and 127
     int8_t getLeftStickX();
     int8_t getLeftStickY();
@@ -126,6 +139,7 @@ private:
     int clientport = 12346;
     IPAddress serverAddr;
 
+    uint8_t analogBtnEventThreshold = 40;
     callbackVoid_t _callback_goingActive = nullptr;
     callbackVoid_t _callback_goingInactive = nullptr;
     callbackVoid_t _callback_startRegistration = nullptr;
@@ -149,6 +163,24 @@ private:
 
     callbackPressed_t _callback_leftstick = nullptr;
     callbackPressed_t _callback_rightstick = nullptr;
+
+    callbackPressed_t _callback_l1= nullptr;
+    callbackPressed_t _callback_l2 = nullptr;
+    callbackPressed_t _callback_r1= nullptr;
+    callbackPressed_t _callback_r2 = nullptr;
+
+    uint8_t analogThresholdHighLX = 255;
+    uint8_t analogThresholdLowLX = 0;
+    callbackAnalogStick_t _callback_LX = nullptr;
+    uint8_t analogThresholdHighLY = 255;
+    uint8_t analogThresholdLowLY = 0;
+    callbackAnalogStick_t _callback_LY = nullptr;
+    uint8_t analogThresholdHighRX = 255;
+    uint8_t analogThresholdLowRX = 0;
+    callbackAnalogStick_t _callback_RX = nullptr;
+    uint8_t analogThresholdHighRY = 255;
+    uint8_t analogThresholdLowRY = 0;
+    callbackAnalogStick_t _callback_RY = nullptr;
 };
 
 #endif
