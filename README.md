@@ -11,4 +11,12 @@ Wire two Nodemcu like this
 In the BaseStationBrainPS project you must setup the PS3 controller mac address.
 Upload BaseStationBrainPS to the first Nodemcu and the BaseStationBrainWIFI project to the second Nodemcu. 
 
+# Setup RC vehicle
+
+For every vehicle MiniSkidi, MiniDump and Excavator there is a project which must be compiled and uploaded to the nodemcu of the vehicle. 
+
+# Running
+
+After uploaded every sketch, just switch the vehicle and power up the base station. Connect the PS3 controller and cycle through your vehicles with the select button.
+
 [GithubProfBoots]: https://github.com/ProfBoots
