@@ -19,4 +19,8 @@ For every vehicle MiniSkidi, MiniDump and Excavator there is a project which mus
 
 After uploaded every sketch, just switch the vehicle and power up the base station. Connect the PS3 controller and cycle through your vehicles with the select button.
 
+
+
+[![Watch the video](https://img.youtube.com/vi/WLLasP6-6oY/hqdefault.jpg)](https://youtu.be/WLLasP6-6oY)
+
 [GithubProfBoots]: https://github.com/ProfBoots
