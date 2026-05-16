@@ -92,7 +92,13 @@ inline EspNowMsg makeData(const uint8_t *buf, size_t len, float value = 0.f) {
   return m;
 }
 
-// ── Receive helper ────────────────────────────────────────────
+// ── Receive callback compatibility ───────────────────────────
+// Hardcoded for Core 2.x (bluepad32 framework).
+// If you switch to a stock Core 3.x framework, change these to:
+//   #define ESP_NOW_RECV_CB_ARGS const esp_now_recv_info_t *info
+//   #define ESP_NOW_SRC_MAC      info->src_addr
+#define ESP_NOW_RECV_CB_ARGS const uint8_t *info
+#define ESP_NOW_SRC_MAC      info
 // Returns false if the buffer is too short to contain a valid message.
 inline bool parseMsg(const uint8_t *raw, int len, EspNowMsg &out) {
   if (len < 1) return false;

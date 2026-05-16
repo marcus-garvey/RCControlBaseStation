@@ -177,13 +177,13 @@ void sendDummyData() {
 
 // ── Receive callback ─────────────────────────────────────────
 
-void onReceive(const esp_now_recv_info_t *info,
+void onReceive(ESP_NOW_RECV_CB_ARGS,
                const uint8_t *data, int len) {
   EspNowMsg msg;
   if (!parseMsg(data, len, msg)) return;
 
   // sender MAC comes from the callback — no payload field needed
-  const uint8_t *srcMAC = info->src_addr;
+  const uint8_t *srcMAC = ESP_NOW_SRC_MAC;
 
   switch (msg.msgType) {
 
