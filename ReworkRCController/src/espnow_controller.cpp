@@ -24,15 +24,13 @@
 //   • Button on BUTTON_PIN cycles the active slave (ACTIVATE / DEACTIVATE).
 //   • Master sends MSG_ACTIVATE to one slave at a time and waits for
 //     MSG_ACTIVATE_ACK. If no ACK arrives within 2 s the slave is removed.
-//   • Gamepad state is encoded into DataPayload.data[32] and forwarded to
-//     the active slave as MSG_DATA whenever a new PKT_STATE arrives via UART.
+//   • Gamepad state is forwarded to the active slave as MSG_GAMEPAD_DATA
+//     whenever a new PKT_STATE arrives via UART.
 //
-// DataPayload.data layout (14 of 32 bytes used):
-//   [0]      pad_id          uint8_t   controller slot 0-3
-//   [1]      event           uint8_t   0=state 1=connect 2=disconnect
-//   [2-13]   StatePayload    12 bytes  raw gamepad state (see protocol.h)
-//   [14-31]  reserved / zero
-//   DataPayload.value = millis() cast to float (send timestamp)
+// GamepadState layout (12 bytes):
+//   [0-9]    raw gamepad state bytes
+//   [10]     pad_id        controller slot 0-3
+//   [11]     event         0=state 1=connect 2=disconnect
 //
 // On PKT_CONNECT from ESP32 #1:
 //   • A player-ID (1-4) is assigned and sent back as PKT_SET_PLAYER so
@@ -46,21 +44,24 @@
 #include <Arduino.h>
 #include <esp_now.h>
 #include <WiFi.h>
-#include "protocol.h"         // UART frame types + StatePayload + RxParser
-#include "espnow_protocol.h"  // EspNowMsg, MsgType, makeSimple, makeData, …
+#include "serial_protocol.h"         // UART frame types + GamepadState + RxParser
+#include "espnow_protocol.h"  // EspNowMsg, MsgType, makeSimple, makeGamepadData, …
+#include "debounced_button.h"
 
 // ── Hardware ─────────────────────────────────────────────────
 static constexpr uint8_t  UART2_TX_PIN          = 17;
 static constexpr uint8_t  UART2_RX_PIN          = 16;
-static constexpr uint8_t  BUTTON_PIN            = 0;    // BOOT button
+static constexpr uint8_t  BUTTON_PIN            = GPIO_NUM_5;    // BOOT button
 static constexpr uint32_t CONTROLLER_TIMEOUT_MS = 2000;
 static constexpr int      NUM_SLOTS             = 4;
+static constexpr uint8_t  LED_PIN               = 2;    // on-board LED (adjust if needed)
+static constexpr uint32_t LED_BLINK_MS          = 500;  // blink interval
 
-// ── DataPayload.data byte offsets ─────────────────────────────
+// ── GamepadState data offsets ─────────────────────────────
 // Keep in sync with any slave that decodes the payload.
-static constexpr uint8_t DP_PAD_ID    = 0;   // 1 byte
-static constexpr uint8_t DP_EVENT     = 1;   // 1 byte  0=state 1=connect 2=disconnect
-static constexpr uint8_t DP_STATE     = 2;   // 12 bytes (StatePayload)
+static constexpr uint8_t DP_PAD_ID    = 10;   // 1 byte
+static constexpr uint8_t DP_EVENT     = 11;   // 1 byte  0=state 1=connect 2=disconnect
+static constexpr uint8_t DP_STATE     = 0;   // 10 bytes start of raw GamepadState
 
 // ── ESP-NOW slave list ────────────────────────────────────────
 #define MAX_SLAVES 20
@@ -75,21 +76,21 @@ struct Slave {
 static Slave    slaves[MAX_SLAVES];
 static int      slaveCount = 0;
 static int      activeSlot = -1;   // index into slaves[], -1 = none
+static bool     ledState = false;
+static uint32_t lastLedToggle = 0;
 
 // ── ACTIVATE handshake state ──────────────────────────────────
 static bool     waitingForActivateAck = false;
 static uint32_t activateSentAt        = 0;
 static int      pendingSlot           = -1;
 
-// ── Button debounce ───────────────────────────────────────────
-static bool     lastButtonState = HIGH;
-static uint32_t lastDebounce    = 0;
+static DebouncedButton button(BUTTON_PIN, 50);
 
 // ── Controller mirror (UART side) ─────────────────────────────
 struct GamepadSlot {
     bool         connected     = false;
     uint8_t      player_id     = 0;
-    StatePayload state         = {};
+    GamepadState state         = {};
     uint32_t     last_state_ms = 0;
 };
 static GamepadSlot gSlots[NUM_SLOTS];
@@ -182,32 +183,33 @@ static void selectNextSlave() {
 }
 
 // =============================================================
-// Forward gamepad state to the active slave via MSG_DATA
+// Forward gamepad state / controller events to the active slave
 // =============================================================
 
-// Encode pad_id + event + StatePayload into DataPayload.data[32]
-static void buildDataPayload(uint8_t pad_id, uint8_t event,
-                              const StatePayload* state,
-                              uint8_t out[32]) {
-    memset(out, 0, 32);
-    out[DP_PAD_ID] = pad_id;
-    out[DP_EVENT]  = event;
-    if (state != nullptr)
-        memcpy(&out[DP_STATE], state->data, sizeof(StatePayload)); // 12 bytes
+// Pack pad_id + event into the reserved GamepadState bytes.
+static void buildGamepadPayload(uint8_t pad_id, uint8_t event,
+                                const GamepadState* state,
+                                GamepadState& out) {
+    if (state != nullptr) {
+        out = *state;
+    } else {
+        memset(&out, 0, sizeof(out));
+    }
+    out.data[10] = pad_id;
+    out.data[11] = event;
 }
 
 static void forwardToSlave(uint8_t pad_id, uint8_t event,
-                            const StatePayload* state) {
+                            const GamepadState* state) {
     if (activeSlot < 0 || activeSlot >= slaveCount) return;
 
-    uint8_t buf[32];
-    buildDataPayload(pad_id, event, state, buf);
+    GamepadState payload;
+    buildGamepadPayload(pad_id, event, state, payload);
 
-    // value carries the send timestamp so the slave can measure latency
-    EspNowMsg msg = makeData(buf, 32, static_cast<float>(millis()));
+    EspNowMsg msg = makeGamepadData(payload);
     esp_now_send(slaves[activeSlot].mac,
                  reinterpret_cast<uint8_t*>(&msg),
-                 msgSize(MSG_DATA));
+                 msgSize(MSG_GAMEPAD_DATA));
 }
 
 // =============================================================
@@ -293,7 +295,7 @@ static void unregisterController(uint8_t pad_id) {
 
     gSlots[pad_id].connected = false;
     gSlots[pad_id].player_id = 0;
-    memset(&gSlots[pad_id].state, 0, sizeof(StatePayload));
+    memset(&gSlots[pad_id].state, 0, sizeof(GamepadState));
 }
 
 // =============================================================
@@ -322,15 +324,15 @@ static void handleIncoming(uint8_t type, uint8_t pad_id,
             break;
 
         case PKT_STATE: {
-            if (len != sizeof(StatePayload)) {
+            if (len != sizeof(GamepadState)) {
                 Serial.printf("[UART] STATE wrong length %d (expected %d)\n",
-                              len, static_cast<int>(sizeof(StatePayload)));
+                              len, static_cast<int>(sizeof(GamepadState)));
                 break;
             }
-            memcpy(gSlots[pad_id].state.data, data, sizeof(StatePayload));
+            memcpy(gSlots[pad_id].state.data, data, sizeof(GamepadState));
             gSlots[pad_id].last_state_ms = millis();
 
-            // Forward to active slave as MSG_DATA (event=0)
+            // Forward to active slave as MSG_GAMEPAD_DATA (event=0)
             forwardToSlave(pad_id, 0, &gSlots[pad_id].state);
             break;
         }
@@ -401,7 +403,7 @@ void setup() {
     Serial.begin(115200);
     Serial.println("[ESP32#2] ESP-NOW Master node starting");
 
-    pinMode(BUTTON_PIN, INPUT_PULLUP);
+    button.begin();
 
     // UART2 to ESP32 #1
     Serial2.begin(UART_BAUD, SERIAL_8N1, UART2_RX_PIN, UART2_TX_PIN);
@@ -427,6 +429,9 @@ void setup() {
     esp_now_add_peer(&bcastPeer);
 
     Serial.println("[ESP32#2] Ready — waiting for slaves and UART packets");
+    // LED setup
+    pinMode(LED_PIN, OUTPUT);
+    digitalWrite(LED_PIN, LOW);
 }
 
 void loop() {
@@ -439,13 +444,9 @@ void loop() {
     }
 
     // ── Button: cycle active slave ────────────────────────────
-    bool reading = digitalRead(BUTTON_PIN);
-    if (reading != lastButtonState) lastDebounce = millis();
-    if ((millis() - lastDebounce) > 50 &&
-         reading == LOW && lastButtonState == HIGH) {
+    if (button.update() && button.pressed()) {
         selectNextSlave();
     }
-    lastButtonState = reading;
 
     // ── ACTIVATE timeout: remove unresponsive slave ───────────
     if (waitingForActivateAck &&
@@ -469,5 +470,12 @@ void loop() {
     if (millis() - lastDbg >= 2000) {
         printStatus();
         lastDbg = millis();
+    }
+
+    // ── Blink onboard LED (non-blocking) ─────────────────────
+    if (millis() - lastLedToggle >= LED_BLINK_MS) {
+        ledState = !ledState;
+        digitalWrite(LED_PIN, ledState ? HIGH : LOW);
+        lastLedToggle = millis();
     }
 }

@@ -20,7 +20,7 @@
 
 #include <Arduino.h>
 #include <Bluepad32.h>
-#include "protocol.h"
+#include "serial_protocol.h"
 
 // ── Hardware config ───────────────────────────────────────────
 static constexpr uint8_t  UART2_TX_PIN = 17;
@@ -78,11 +78,11 @@ void onDisconnectedController(ControllerPtr ctl) {
 }
 
 // =============================================================
-// Build and send a StatePayload for one controller
+// Build and send a GamepadState for one controller
 // =============================================================
 
 static void sendState(uint8_t idx, ControllerPtr ctl) {
-    StatePayload s = {};   // zero-initialise all bits
+    GamepadState s = {};   // zero-initialise all bits
 
     const uint32_t btn  = ctl->buttons();
     const uint32_t misc = ctl->miscButtons();

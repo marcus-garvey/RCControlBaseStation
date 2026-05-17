@@ -6,7 +6,7 @@
 //      uint8_t  msgType
 //    Payload (union, only as large as needed)
 //      RegisterPayload  : name(16) + nodeId(1)  -> 17 bytes
-//      DataPayload      : data(32) + value(4)   -> 36 bytes
+//      GamepadState     : raw gamepad state      -> 12 bytes
 //      (ACK / ACTIVATE / DEACTIVATE / ACTIVATE_ACK: no payload)
 //
 //  Sender MAC: NOT in payload — read from info->src_addr in callback.
@@ -16,15 +16,16 @@
 #pragma once
 #include <stdint.h>
 #include <string.h>
+#include "gamepad_state.h"
 
 // ── Message types ────────────────────────────────────────────
 enum MsgType : uint8_t {
-  MSG_REGISTER     = 0,   // Slave -> Master  (broadcast)
-  MSG_ACK          = 1,   // Master -> Slave  (unicast, no payload)
-  MSG_ACTIVATE     = 2,   // Master -> Slave  (unicast, no payload)
-  MSG_ACTIVATE_ACK = 3,   // Slave  -> Master (unicast, no payload)
-  MSG_DATA         = 4,   // Master -> Slave  (unicast, no ACK expected)
-  MSG_DEACTIVATE   = 5,   // Master -> Slave  (unicast, no payload, no ACK)
+  MSG_REGISTER      = 0,   // Slave -> Master  (broadcast)
+  MSG_ACK           = 1,   // Master -> Slave  (unicast, no payload)
+  MSG_ACTIVATE      = 2,   // Master -> Slave  (unicast, no payload)
+  MSG_ACTIVATE_ACK  = 3,   // Slave  -> Master (unicast, no payload)
+  MSG_GAMEPAD_DATA  = 4,   // Master -> Slave  (unicast, raw gamepad state)
+  MSG_DEACTIVATE    = 5,   // Master -> Slave  (unicast, no payload, no ACK)
 };
 
 // ── Payload definitions ──────────────────────────────────────
@@ -37,17 +38,12 @@ struct RegisterPayload {
   uint8_t nodeId;         // optional fixed node ID (0 = none)
 };
 
-struct DataPayload {
-  uint8_t data[32];
-  float   value;
-};
-
 // ── Full message (union) ─────────────────────────────────────
 struct EspNowMsg {
   uint8_t msgType;          // 1-byte header
   union {
     RegisterPayload reg;    // 17 bytes  -> MSG_REGISTER
-    DataPayload     data;   // 36 bytes  -> MSG_DATA
+    GamepadState    gamepad; // 12 bytes  -> MSG_GAMEPAD_DATA
     // all other types: no payload
   } payload;
 };
@@ -58,13 +54,13 @@ struct EspNowMsg {
 // Always pass msgSize(type) to esp_now_send() — never sizeof(EspNowMsg)!
 inline size_t msgSize(uint8_t type) {
   switch (type) {
-    case MSG_REGISTER:     return 1 + sizeof(RegisterPayload); // 18 bytes
-    case MSG_DATA:         return 1 + sizeof(DataPayload);     // 37 bytes
+    case MSG_REGISTER:      return 1 + sizeof(RegisterPayload); // 18 bytes
+    case MSG_GAMEPAD_DATA:  return 1 + sizeof(GamepadState);     // 13 bytes
     case MSG_ACK:
     case MSG_ACTIVATE:
     case MSG_ACTIVATE_ACK:
     case MSG_DEACTIVATE:
-    default:               return 1;                           //  1 byte
+    default:                return 1;                           //  1 byte
   }
 }
 
@@ -84,11 +80,10 @@ inline EspNowMsg makeRegister(const char *name, uint8_t nodeId = 0) {
   return m;
 }
 
-inline EspNowMsg makeData(const uint8_t *buf, size_t len, float value = 0.f) {
+inline EspNowMsg makeGamepadData(const GamepadState &state) {
   EspNowMsg m = {};
-  m.msgType = MSG_DATA;
-  memcpy(m.payload.data.data, buf, len < 32 ? len : 32);
-  m.payload.data.value = value;
+  m.msgType = MSG_GAMEPAD_DATA;
+  m.payload.gamepad = state;
   return m;
 }
 

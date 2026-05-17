@@ -1,6 +1,6 @@
 #pragma once
 // =============================================================
-// protocol.h  —  Shared UART frame definitions
+// serial_protocol.h  —  Shared UART frame definitions
 // Include this file on BOTH ESP32 nodes.
 //
 // Wire format:
@@ -38,22 +38,23 @@
 
 #include <stdint.h>
 #include <string.h>
+#include "gamepad_state.h"
 
 // ── Constants ────────────────────────────────────────────────
 #define UART_START_BYTE  0xAA
-#define MAX_PAYLOAD      16      // >= sizeof(StatePayload) = 12
+#define MAX_PAYLOAD      16      // >= sizeof(GamepadState) = 12
 #define UART_BAUD        115200
 
 // ── Packet types ─────────────────────────────────────────────
 typedef enum : uint8_t {
     PKT_CONNECT    = 0x01,   // ESP32#1 → #2  controller connected   (no payload)
     PKT_DISCONNECT = 0x02,   // ESP32#1 → #2  controller disconnected (no payload)
-    PKT_STATE      = 0x03,   // ESP32#1 → #2  full gamepad state      (StatePayload)
+    PKT_STATE      = 0x03,   // ESP32#1 → #2  full gamepad state      (GamepadState)
     PKT_PING       = 0x04,   // ESP32#1 → #2  heartbeat               (no payload)
     PKT_SET_PLAYER = 0x05,   // ESP32#2 → #1  set player LED          (SetPlayerPayload)
 } PktType;
 
-// ── StatePayload  (12 bytes) ──────────────────────────────────
+// ── GamepadState  (12 bytes) ──────────────────────────────────
 //
 //  Byte  0  — D-Pad (bits 0-3) + Face buttons (bits 4-7)
 //  Byte  1  — L1/R1 + thumb clicks + select/start/system/back
@@ -64,61 +65,6 @@ typedef enum : uint8_t {
 //  Bytes10-11 padding
 //
 // Bit order within each byte: LSB = bit 0 = first field declared.
-union StatePayload {
-    struct __attribute__((packed)) {
-
-        // ── Byte 0: D-Pad + Face buttons ─────────────────────
-        bool btn_dpad_up    : 1;  // dpad() & DPAD_UP
-        bool btn_dpad_down  : 1;  // dpad() & DPAD_DOWN
-        bool btn_dpad_left  : 1;  // dpad() & DPAD_LEFT
-        bool btn_dpad_right : 1;  // dpad() & DPAD_RIGHT
-        bool btn_triangle   : 1;  // BUTTON_Y   (PS:△  Xbox:Y)
-        bool btn_cross      : 1;  // BUTTON_A   (PS:✕  Xbox:A)
-        bool btn_square     : 1;  // BUTTON_X   (PS:□  Xbox:X)
-        bool btn_circle     : 1;  // BUTTON_B   (PS:○  Xbox:B)
-
-        // ── Byte 1: Shoulders + Sticks + System buttons ───────
-        bool btn_l1         : 1;  // BUTTON_SHOULDER_L  (digital bump)
-        bool btn_r1         : 1;  // BUTTON_SHOULDER_R  (digital bump)
-        bool btn_thumb_l    : 1;  // BUTTON_THUMB_L     (L3 click)
-        bool btn_thumb_r    : 1;  // BUTTON_THUMB_R     (R3 click)
-        bool btn_select     : 1;  // MISC_BUTTON_SELECT (Create / View)
-        bool btn_start      : 1;  // MISC_BUTTON_START  (Options / Menu)
-        bool btn_system     : 1;  // MISC_BUTTON_SYSTEM (PS / Xbox guide)
-        bool btn_back       : 1;  // MISC_BUTTON_BACK   (Share extra / back)
-
-        // ── Byte 2: Capture + reserved ────────────────────────
-        bool btn_capture    : 1;  // MISC_BUTTON_CAPTURE (PS:Mute  Switch:Capture)
-        bool _res0          : 1;
-        bool _res1          : 1;
-        bool _res2          : 1;
-        bool _res3          : 1;
-        bool _res4          : 1;
-        bool _res5          : 1;
-        bool _res6          : 1;
-
-        // ── Byte 3: padding ───────────────────────────────────
-        uint8_t _pad0;
-
-        // ── Bytes 4-7: analog sticks ──────────────────────────
-        int8_t  analog_lx;        // left  stick X  (−128…+127)
-        int8_t  analog_ly;        // left  stick Y  (−128…+127)
-        int8_t  analog_rx;        // right stick X  (−128…+127)
-        int8_t  analog_ry;        // right stick Y  (−128…+127)
-
-        // ── Bytes 8-9: analog triggers ────────────────────────
-        uint8_t analog_l2;        // L2 / brake     (0…255)
-        uint8_t analog_r2;        // R2 / throttle  (0…255)
-
-        // ── Bytes 10-11: padding ──────────────────────────────
-        uint8_t _pad1;
-        uint8_t _pad2;
-
-    } part;
-
-    uint8_t data[12];   // raw byte access for send_frame / memcpy
-};
-static_assert(sizeof(StatePayload) == 12, "StatePayload must be exactly 12 bytes");
 
 // ── SET_PLAYER payload (1 byte) ───────────────────────────────
 typedef struct __attribute__((packed)) {
