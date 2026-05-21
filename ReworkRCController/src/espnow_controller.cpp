@@ -113,6 +113,10 @@ static uint32_t readySentAt           = 0;
 static constexpr uint32_t READY_RESEND_MS = 500;
 static constexpr uint32_t HEARTBEAT_MS = 3000;
 static uint32_t lastHeartbeatSend = 0;
+static constexpr uint32_t DISPLAY_PAGE_CHANGE_MS = 4000;
+static uint32_t lastDisplayPageChange = 0;
+static uint8_t displayPage = 0;  // 0=Controller, 1=Gamepad, 2=Slaves (for error mode)
+                                 // or 0=Status, 1=Active, 2=Gamepads (for ok mode)
 
 static DebouncedButton button(BUTTON_PIN, 50);
 
@@ -371,20 +375,56 @@ static void unregisterController(uint8_t pad_id) {
 }
 
 static void displayUpdate();
+static void displayErrorStatusPage(uint8_t page, bool slotsPresent);
 static void sendHeartbeats();
 
 // =============================================================
 // Display implementation
 // =============================================================
 
+static void displayErrorStatusPage(uint8_t page, bool slotsPresent) {
+    display.setTextSize(2);
+    display.setTextColor(SSD1306_WHITE);
+
+    if (page == 0) {
+        // Controller status page
+        display.setCursor(0, 0);
+        display.println("CONTROLLER");
+        display.drawLine(0, 18, OLED_WIDTH - 1, 18, SSD1306_WHITE);
+        display.setTextSize(1);
+        display.setCursor(0, 24);
+        display.println(gamepadControllerReady ? "Ready" : "NOT READY");
+        display.setCursor(0, 36);
+        display.setTextSize(2);
+        display.println(gamepadControllerReady ? "  OK" : "  MISSING");
+    } else if (page == 1) {
+        // Gamepad status page
+        display.setCursor(0, 0);
+        display.println("GAMEPAD");
+        display.drawLine(0, 18, OLED_WIDTH - 1, 18, SSD1306_WHITE);
+        display.setTextSize(1);
+        display.setCursor(0, 24);
+        display.println(slotsPresent ? "Connected" : "NO PADS");
+        display.setCursor(0, 36);
+        display.setTextSize(2);
+        display.println(slotsPresent ? "  OK" : "  MISSING");
+    } else {
+        // Slaves status page
+        display.setCursor(0, 0);
+        display.println("SLAVES");
+        display.drawLine(0, 18, OLED_WIDTH - 1, 18, SSD1306_WHITE);
+        display.setTextSize(1);
+        display.setCursor(0, 24);
+        display.printf("%d Slaves\n", slaveCount);
+        display.setCursor(0, 36);
+        display.setTextSize(2);
+        display.println(slaveCount > 0 ? "  OK" : "  MISSING");
+    }
+}
+
 static void displayUpdate() {
     display.clearDisplay();
     display.setTextColor(SSD1306_WHITE);
-    display.setTextSize(1);
-
-    display.setCursor(0, 0);
-    display.print("RC Controller");
-    display.drawLine(0, 9, OLED_WIDTH - 1, 9, SSD1306_WHITE);
 
     bool slotsPresent = false;
     for (int i = 0; i < NUM_SLOTS; i++) {
@@ -396,40 +436,60 @@ static void displayUpdate() {
 
     const bool allOk = gamepadControllerReady && slotsPresent && slaveCount > 0;
 
-    if (!allOk) {
-        display.setCursor(0, 14);
-        display.print("Status:");
-
-        display.setCursor(0, 24);
-        display.print("Gamepad Ctrl: ");
-        display.print(gamepadControllerReady ? "OK" : "MISSING");
-
-        display.setCursor(0, 34);
-        display.print("Gamepad: ");
-        display.print(slotsPresent ? "OK" : "MISSING");
-
-        display.setCursor(0, 44);
-        display.print("Slaves: ");
-        display.print(slaveCount > 0 ? "OK" : "MISSING");
-    } else {
-        display.setCursor(0, 12);
-        display.print("Active: ");
-        display.print(activeSlot >= 0 ? slaves[activeSlot].name : "--");
-        if (waitingForActivateAck) display.print(" ?");
-        display.drawLine(0, 23, OLED_WIDTH - 1, 23, SSD1306_WHITE);
-
-        int y = 26;
-        for (int i = 0; i < NUM_SLOTS && y < 60; i++) {
-            if (gSlots[i].connected) {
-                display.setCursor(0, y);
-                display.printf("Pad%d: #%d", i, gSlots[i].player_id);
-                y += 10;
-            }
-        }
-
-        display.setCursor(0, 56);
-        display.printf("Slaves:%d", slaveCount);
+    // Update display page every DISPLAY_PAGE_CHANGE_MS
+    if (millis() - lastDisplayPageChange >= DISPLAY_PAGE_CHANGE_MS) {
+        lastDisplayPageChange = millis();
+        displayPage = (displayPage + 1) % 3;
     }
+
+    if (!allOk) {
+        // Error mode: show rotating error status pages with large text
+        displayErrorStatusPage(displayPage, slotsPresent);
+    } else {
+        // OK mode: show normal operational pages
+        display.setTextSize(1);
+        display.setCursor(0, 0);
+        display.print("RC Controller");
+        display.drawLine(0, 9, OLED_WIDTH - 1, 9, SSD1306_WHITE);
+
+        if (displayPage == 0) {
+            // Status overview page
+            display.setTextSize(1);
+            display.setCursor(0, 14);
+            display.print("Active: ");
+            display.println(activeSlot >= 0 ? slaves[activeSlot].name : "--");
+            if (waitingForActivateAck) {
+                display.setCursor(0, 24);
+                display.println("(Activating...)");
+            }
+            display.setCursor(0, 34);
+            display.print("Available Slaves: ");
+            display.println(slaveCount);
+        } else if (displayPage == 1) {
+            // Connected gamepads page
+            display.setTextSize(1);
+            display.setCursor(0, 14);
+            display.println("Gamepads:");
+            int y = 26;
+            for (int i = 0; i < NUM_SLOTS && y < 60; i++) {
+                if (gSlots[i].connected) {
+                    display.setCursor(0, y);
+                    display.printf("Pad%d: ID#%d", i, gSlots[i].player_id);
+                    y += 10;
+                }
+            }
+        } else {
+            // Slaves info page
+            display.setTextSize(1);
+            display.setCursor(0, 14);
+            display.printf("Slaves: %d\n", slaveCount);
+            display.setCursor(0, 24);
+            display.printf("Active: %d\n", activeSlot);
+            display.setCursor(0, 34);
+            display.printf("Fail Cnt: %d\n", activeSlot >= 0 ? slaves[activeSlot].sendFailCount : 0);
+        }
+    }
+
     display.display();
 }
 
@@ -447,12 +507,10 @@ static void sendHeartbeats() {
         if (result != ESP_OK) {
             slaves[i].sendFailCount = static_cast<uint8_t>(slaves[i].sendFailCount + 2);
             sendCallbackSuppressed[i] = true;
-            Serial.printf("[ESPNOW] Heartbeat send failed immediately to '%s' count=%d/5\n",
-                          slaves[i].name, slaves[i].sendFailCount);
+            Serial.printf("[ESPNOW] Heartbeat send failed immediately to '%s' count=%d/5\n", slaves[i].name, slaves[i].sendFailCount);
 
             if (slaves[i].sendFailCount >= 5) {
-                Serial.printf("[ESPNOW] Removing unresponsive slave '%s' due heartbeat failures\n",
-                              slaves[i].name);
+                Serial.printf("[ESPNOW] Removing unresponsive slave '%s' due heartbeat failures\n", slaves[i].name);
                 removeSlave(i);
                 if (slaveCount > 0) selectNextSlave();
                 continue;
