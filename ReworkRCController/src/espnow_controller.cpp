@@ -356,7 +356,7 @@ static void displayUpdate() {
     display.setTextSize(1);
 
     display.setCursor(0, 0);
-    display.print("ESP-NOW Controller");
+    display.print("RC Controller");
     display.drawLine(0, 9, OLED_WIDTH - 1, 9, SSD1306_WHITE);
 
     bool slotsPresent = false;
