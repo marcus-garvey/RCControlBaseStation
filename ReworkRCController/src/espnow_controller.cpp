@@ -97,7 +97,7 @@ static uint32_t activateSentAt        = 0;
 static int      pendingSlot           = -1;
 
 // ── Gamepad controller handshake ───────────────────────────────
-static bool     controllerReady       = false;
+static bool     gamepadControllerReady       = false;
 static uint32_t readySentAt           = 0;
 static constexpr uint32_t READY_RESEND_MS = 500;
 
@@ -359,16 +359,31 @@ static void displayUpdate() {
     display.print("ESP-NOW Controller");
     display.drawLine(0, 9, OLED_WIDTH - 1, 9, SSD1306_WHITE);
 
-    if (!controllerReady) {
+    bool slotsPresent = false;
+    for (int i = 0; i < NUM_SLOTS; i++) {
+        if (gSlots[i].connected) {
+            slotsPresent = true;
+            break;
+        }
+    }
+
+    const bool allOk = gamepadControllerReady && slotsPresent && slaveCount > 0;
+
+    if (!allOk) {
         display.setCursor(0, 14);
-        display.print("Waiting for gamepad...");
+        display.print("Status:");
+
         display.setCursor(0, 24);
-        display.print("Gamepad: not registered");
-    } else if (slaveCount == 0) {
-        display.setCursor(0, 14);
-        display.print("Waiting for slaves...");
-        display.setCursor(0, 24);
-        display.print("Gamepad: registered");
+        display.print("Gamepad Ctrl: ");
+        display.print(gamepadControllerReady ? "OK" : "MISSING");
+
+        display.setCursor(0, 34);
+        display.print("Gamepad: ");
+        display.print(slotsPresent ? "OK" : "MISSING");
+
+        display.setCursor(0, 44);
+        display.print("Slaves: ");
+        display.print(slaveCount > 0 ? "OK" : "MISSING");
     } else {
         display.setCursor(0, 12);
         display.print("Active: ");
@@ -397,7 +412,7 @@ static void displayUpdate() {
 
 static void handleIncoming(uint8_t type, uint8_t pad_id,
                             uint8_t* data, uint8_t len) {
-    if (!controllerReady && type != PKT_CONTROLLER_READY_ACK) {
+    if (!gamepadControllerReady && type != PKT_CONTROLLER_READY_ACK) {
         Serial.printf("[UART] Ignoring type 0x%02X until controller ready\n", type);
         return;
     }
@@ -409,8 +424,8 @@ static void handleIncoming(uint8_t type, uint8_t pad_id,
 
     switch (type) {
         case PKT_CONTROLLER_READY_ACK:
-            if (!controllerReady) {
-                controllerReady = true;
+            if (!gamepadControllerReady) {
+                gamepadControllerReady = true;
                 Serial.println("[UART] Received CONTROLLER_READY_ACK");
             }
             break;
@@ -471,10 +486,11 @@ static void checkTimeouts() {
 // =============================================================
 
 static void printStatus() {
-    Serial.printf("[STATUS] Slaves:%d  Active:%d  Waiting:%s\n",
+    Serial.printf("[STATUS] Slaves:%d  Active:%d  Waiting:%s  Controller:%s\n",
                   slaveCount,
                   activeSlot,
-                  waitingForActivateAck ? "yes" : "no");
+                  waitingForActivateAck ? "yes" : "no",
+                  gamepadControllerReady ? "registered" : "not registered");
 
     for (int i = 0; i < NUM_SLOTS; i++) {
         if (!gSlots[i].connected) continue;
@@ -575,7 +591,7 @@ void loop() {
     }
 
     // ── Resend ready handshake until controller acknowledges ───
-    if (!controllerReady && millis() - readySentAt >= READY_RESEND_MS) {
+    if (!gamepadControllerReady && millis() - readySentAt >= READY_RESEND_MS) {
         sendControllerReady();
     }
 
