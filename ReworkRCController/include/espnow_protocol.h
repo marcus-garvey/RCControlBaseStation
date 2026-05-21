@@ -21,11 +21,12 @@
 // ── Message types ────────────────────────────────────────────
 enum MsgType : uint8_t {
   MSG_REGISTER      = 0,   // Slave -> Master  (broadcast)
-  MSG_ACK           = 1,   // Master -> Slave  (unicast, no payload)
+  MSG_ACK           = 10,   // Master -> Slave  (unicast, no payload)
   MSG_ACTIVATE      = 2,   // Master -> Slave  (unicast, no payload)
   MSG_ACTIVATE_ACK  = 3,   // Slave  -> Master (unicast, no payload)
   MSG_GAMEPAD_DATA  = 4,   // Master -> Slave  (unicast, raw gamepad state)
   MSG_DEACTIVATE    = 5,   // Master -> Slave  (unicast, no payload, no ACK)
+  MSG_HEARTBEAT     = 6,   // Master -> Slave  (unicast, no payload)
 };
 
 // ── Payload definitions ──────────────────────────────────────

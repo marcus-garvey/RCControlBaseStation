@@ -18,11 +18,12 @@ static constexpr uint8_t LED_TRIANGLE_PIN = 23;
 static constexpr uint8_t SERVO_PIN        = 16;
 
 Servo servo;
-
+static constexpr uint32_t HEARTBEAT_TIMEOUT_MS = 6000; // if no heartbeat received within this time, consider master disconnected
 uint8_t broadcastMAC[] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
 uint8_t masterMAC[6];
 bool    registered = false;
 bool    active     = false;
+uint32_t lastHeartbeatAt = 0;
 
 // ── Receive buffer ───────────────────────────────────────────
 GamepadState rxData;
@@ -51,6 +52,7 @@ void onReceive(ESP_NOW_RECV_CB_ARGS,
       esp_now_add_peer(&peer);
 
       registered = true;
+      lastHeartbeatAt = millis();
       Serial.println("Registered with master as '" DEVICE_NAME "'");
       break;
     }
@@ -68,6 +70,13 @@ void onReceive(ESP_NOW_RECV_CB_ARGS,
       active = false;
       Serial.println("DEACTIVATE — now inactive");
       // no ACK — fire and forget from master side
+      break;
+    }
+
+    case MSG_HEARTBEAT: {
+      if (registered && memcmp(srcMAC, masterMAC, 6) == 0) {
+        lastHeartbeatAt = millis();
+      }
       break;
     }
 
@@ -162,14 +171,22 @@ void loop() {
     delay(2000);
     return;
   }
+  if (lastHeartbeatAt > 0 && millis() - lastHeartbeatAt >= HEARTBEAT_TIMEOUT_MS) {
+    Serial.println("Heartbeat timeout - resetting registration");
+    registered = false;
+    active = false;
+    esp_now_del_peer(masterMAC);
+    memset(masterMAC, 0, sizeof(masterMAC));
+    lastHeartbeatAt = 0;
+    return;
+  }
 
-  // ── Process any received data outside the callback ────────
   processData();
-  
-  // ── Debug print every 2 s ────────────────────────────────
-    static uint32_t lastDbg = 0;
-    if (millis() - lastDbg >= 2000) {
-        printStatus();
-        lastDbg = millis();
-    }
+
+  // ── Debug print every 2 s ──────────────────────────────
+  static uint32_t lastDbg = 0;
+  if (millis() - lastDbg >= 2000) {
+    printStatus();
+    lastDbg = millis();
+  }
 }

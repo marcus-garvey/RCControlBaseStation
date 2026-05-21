@@ -91,6 +91,17 @@ static int      activeSlot = -1;   // index into slaves[], -1 = none
 static bool     ledState = false;
 static uint32_t lastLedToggle = 0;
 
+enum SendType : uint8_t {
+    SEND_NONE = 0,
+    SEND_HEARTBEAT,
+    SEND_ACTIVATE,
+    SEND_GAMEPAD,
+    SEND_ACK,
+    SEND_DEACTIVATE,
+};
+static SendType lastSendType[MAX_SLAVES] = {};
+static bool     sendCallbackSuppressed[MAX_SLAVES] = {};
+
 // ── ACTIVATE handshake state ──────────────────────────────────
 static bool     waitingForActivateAck = false;
 static uint32_t activateSentAt        = 0;
@@ -100,6 +111,8 @@ static int      pendingSlot           = -1;
 static bool     gamepadControllerReady       = false;
 static uint32_t readySentAt           = 0;
 static constexpr uint32_t READY_RESEND_MS = 500;
+static constexpr uint32_t HEARTBEAT_MS = 3000;
+static uint32_t lastHeartbeatSend = 0;
 
 static DebouncedButton button(BUTTON_PIN, 50);
 
@@ -127,6 +140,10 @@ static void removeSlave(int slot) {
     if (slot == activeSlot) activeSlot = -1;
     // compact array: overwrite with last entry
     slaves[slot] = slaves[--slaveCount];
+    lastSendType[slot] = lastSendType[slaveCount];
+    sendCallbackSuppressed[slot] = sendCallbackSuppressed[slaveCount];
+    lastSendType[slaveCount] = SEND_NONE;
+    sendCallbackSuppressed[slaveCount] = false;
     if (activeSlot == slaveCount) activeSlot = slot;
 }
 
@@ -164,6 +181,8 @@ static void addSlave(const uint8_t* mac, const char* name, uint8_t nodeId) {
 
 static void sendActivate(int slot) {
     EspNowMsg msg = makeSimple(MSG_ACTIVATE);
+
+    lastSendType[slot] = SEND_ACTIVATE;
     esp_now_send(slaves[slot].mac,
                  reinterpret_cast<uint8_t*>(&msg),
                  msgSize(MSG_ACTIVATE));
@@ -218,6 +237,7 @@ static void forwardToSlave(uint8_t pad_id, uint8_t event,
     buildGamepadPayload(pad_id, event, state, payload);
 
     EspNowMsg msg = makeGamepadData(payload);
+    lastSendType[activeSlot] = SEND_GAMEPAD;
     esp_now_send(slaves[activeSlot].mac,
                  reinterpret_cast<uint8_t*>(&msg),
                  msgSize(MSG_GAMEPAD_DATA));
@@ -237,28 +257,34 @@ static void espnow_send_cb(const uint8_t* mac, esp_now_send_status_t status) {
         }
     }
 
+    if (slot < 0) return;
+
     if (status != ESP_NOW_SEND_SUCCESS) {
+        if (sendCallbackSuppressed[slot]) {
+            sendCallbackSuppressed[slot] = false;
+            lastSendType[slot] = SEND_NONE;
+            return;
+        }
+
+        const int increment = (lastSendType[slot] == SEND_HEARTBEAT) ? 2 : 1;
+        slaves[slot].sendFailCount = static_cast<uint8_t>(slaves[slot].sendFailCount + increment);
         Serial.printf("[ESPNOW] Send failed -> %02X:%02X:%02X:%02X:%02X:%02X\n",
                       mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-        
-        if (slot >= 0) {
-            slaves[slot].sendFailCount++;
-            Serial.printf("[ESPNOW] Slave '%s' fail count: %d/5\n",
-                          slaves[slot].name, slaves[slot].sendFailCount);
-            
-            // Deregister slave if 5 failures reached
-            if (slaves[slot].sendFailCount >= 5) {
-                Serial.printf("[ESPNOW] Removing unresponsive slave '%s'\n",
-                              slaves[slot].name);
-                removeSlave(slot);
-                if (slaveCount > 0) selectNextSlave();
-            }
+        Serial.printf("[ESPNOW] Slave '%s' fail count: %d/5\n",
+                      slaves[slot].name, slaves[slot].sendFailCount);
+        lastSendType[slot] = SEND_NONE;
+
+        if (slaves[slot].sendFailCount >= 5) {
+            Serial.printf("[ESPNOW] Removing unresponsive slave '%s'\n",
+                          slaves[slot].name);
+            removeSlave(slot);
+            if (slaveCount > 0) selectNextSlave();
         }
     } else {
         // Reset fail count on successful send
-        if (slot >= 0) {
-            slaves[slot].sendFailCount = 0;
-        }
+        slaves[slot].sendFailCount = 0;
+        lastSendType[slot] = SEND_NONE;
+        sendCallbackSuppressed[slot] = false;
     }
 }
 
@@ -345,6 +371,7 @@ static void unregisterController(uint8_t pad_id) {
 }
 
 static void displayUpdate();
+static void sendHeartbeats();
 
 // =============================================================
 // Display implementation
@@ -404,6 +431,36 @@ static void displayUpdate() {
         display.printf("Slaves:%d", slaveCount);
     }
     display.display();
+}
+
+static void sendHeartbeats() {
+    if (slaveCount == 0) return;
+
+    int i = 0;
+    while (i < slaveCount) {
+        EspNowMsg msg = makeSimple(MSG_HEARTBEAT);
+        lastSendType[i] = SEND_HEARTBEAT;
+        esp_err_t result = esp_now_send(slaves[i].mac,
+                                       reinterpret_cast<uint8_t*>(&msg),
+                                       msgSize(MSG_HEARTBEAT));
+
+        if (result != ESP_OK) {
+            slaves[i].sendFailCount = static_cast<uint8_t>(slaves[i].sendFailCount + 2);
+            sendCallbackSuppressed[i] = true;
+            Serial.printf("[ESPNOW] Heartbeat send failed immediately to '%s' count=%d/5\n",
+                          slaves[i].name, slaves[i].sendFailCount);
+
+            if (slaves[i].sendFailCount >= 5) {
+                Serial.printf("[ESPNOW] Removing unresponsive slave '%s' due heartbeat failures\n",
+                              slaves[i].name);
+                removeSlave(i);
+                if (slaveCount > 0) selectNextSlave();
+                continue;
+            }
+        }
+
+        i++;
+    }
 }
 
 // =============================================================
@@ -541,10 +598,20 @@ void setup() {
     WiFi.mode(WIFI_STA);
     Serial.printf("[ESP32#2] MAC: %s\n", WiFi.macAddress().c_str());
 
+    
+    // LED setup
+    pinMode(LED_PIN, OUTPUT);
+    digitalWrite(LED_PIN, LOW);
+
+    displayUpdate();
+    sendControllerReady();
+
     if (esp_now_init() != ESP_OK) {
         Serial.println("[ESPNOW] Init failed — halting");
         while (true) delay(100);
     }
+    
+
     esp_now_register_send_cb(espnow_send_cb);
     esp_now_register_recv_cb(espnow_recv_cb);
 
@@ -556,14 +623,8 @@ void setup() {
     bcastPeer.channel = 0;
     bcastPeer.encrypt = false;
     esp_now_add_peer(&bcastPeer);
-
+    
     Serial.println("[ESP32#2] Ready — waiting for slaves and UART packets");
-    // LED setup
-    pinMode(LED_PIN, OUTPUT);
-    digitalWrite(LED_PIN, LOW);
-
-    displayUpdate();
-    sendControllerReady();
 }
 
 void loop() {
@@ -593,6 +654,12 @@ void loop() {
     // ── Resend ready handshake until controller acknowledges ───
     if (!gamepadControllerReady && millis() - readySentAt >= READY_RESEND_MS) {
         sendControllerReady();
+    }
+
+    // ── Heartbeat to slaves every 10 s ─────────────────────────
+    if (millis() - lastHeartbeatSend >= HEARTBEAT_MS) {
+        sendHeartbeats();
+        lastHeartbeatSend = millis();
     }
 
     // ── Watchdog: detect dead controllers ────────────────────
