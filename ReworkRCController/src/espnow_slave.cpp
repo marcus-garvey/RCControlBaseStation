@@ -165,7 +165,7 @@ void setup() {
 void loop() {
   // ── Keep sending REGISTER until the master responds ───────
   if (!registered) {
-    EspNowMsg msg = makeRegister(DEVICE_NAME, DEVICE_NODE_ID);
+    EspNowMsg msg = makeRegister(DEVICE_NAME);
     esp_now_send(broadcastMAC, (uint8_t *)&msg, msgSize(MSG_REGISTER));
     Serial.println("Searching for master...");
     delay(2000);

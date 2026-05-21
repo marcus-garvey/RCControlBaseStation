@@ -80,7 +80,6 @@ static constexpr uint8_t DP_STATE     = 0;   // 10 bytes start of raw GamepadSta
 struct Slave {
     uint8_t  mac[6];
     char     name[NAME_LEN];
-    uint8_t  nodeId;
     uint32_t lastSeen;
     uint8_t  sendFailCount = 0;
 };
@@ -151,7 +150,7 @@ static void removeSlave(int slot) {
     if (activeSlot == slaveCount) activeSlot = slot;
 }
 
-static void addSlave(const uint8_t* mac, const char* name, uint8_t nodeId) {
+static void addSlave(const uint8_t* mac, const char* name) {
     // refresh lastSeen if already known
     for (int i = 0; i < slaveCount; i++) {
         if (memcmp(slaves[i].mac, mac, 6) == 0) {
@@ -171,12 +170,12 @@ static void addSlave(const uint8_t* mac, const char* name, uint8_t nodeId) {
     strncpy(slaves[slaveCount].name,
             (strlen(name) > 0) ? name : "Unknown",
             NAME_LEN - 1);
-    slaves[slaveCount].nodeId   = nodeId;
+    
     slaves[slaveCount].lastSeen = millis();
     slaveCount++;
 
-    Serial.printf("[MASTER] New slave '%s' nodeId=%d (total: %d)\n",
-                  name, nodeId, slaveCount);
+    Serial.printf("[MASTER] New slave '%s' (total: %d)\n",
+                  name, slaveCount);
 }
 
 // =============================================================
@@ -296,21 +295,29 @@ static void espnow_send_cb(const uint8_t* mac, esp_now_send_status_t status) {
 static void espnow_recv_cb(ESP_NOW_RECV_CB_ARGS,
                             const uint8_t* data, int len) {
     EspNowMsg msg;
-    if (!parseMsg(data, len, msg)) return;
+    if (!parseMsg(data, len, msg)) {
+        Serial.printf("[ESPNOW] Failed to parse message (len=%d)\n", len);
+        return;
+    }
 
     const uint8_t* srcMAC = ESP_NOW_SRC_MAC;
+    Serial.printf("[ESPNOW] Received message type %d from %02X:%02X:%02X:%02X:%02X:%02X\n",
+                  msg.msgType, srcMAC[0], srcMAC[1], srcMAC[2], srcMAC[3], srcMAC[4], srcMAC[5]);
 
     switch (msg.msgType) {
 
         case MSG_REGISTER: {
             // Slave announced itself — add to list and reply ACK
             msg.payload.reg.name[NAME_LEN - 1] = '\0';
-            addSlave(srcMAC, msg.payload.reg.name, msg.payload.reg.nodeId);
+            Serial.printf("[MASTER] Got MSG_REGISTER from '%s'\n",
+                          msg.payload.reg.name);
+            addSlave(srcMAC, msg.payload.reg.name);
 
             EspNowMsg ack = makeSimple(MSG_ACK);
-            esp_now_send(srcMAC,
+            esp_err_t result = esp_now_send(srcMAC,
                          reinterpret_cast<uint8_t*>(&ack),
                          msgSize(MSG_ACK));
+            Serial.printf("[MASTER] Sent MSG_ACK: result=%d\n", result);
             break;
         }
 
@@ -668,10 +675,11 @@ void setup() {
         Serial.println("[ESPNOW] Init failed — halting");
         while (true) delay(100);
     }
-    
+    Serial.println("[ESPNOW] Init successful");
 
     esp_now_register_send_cb(espnow_send_cb);
     esp_now_register_recv_cb(espnow_recv_cb);
+    Serial.println("[ESPNOW] Callbacks registered");
 
     // Broadcast peer — needed to send MSG_ACK before a slave is
     // registered as a unicast peer (matches reference master setup)
@@ -680,7 +688,8 @@ void setup() {
     memcpy(bcastPeer.peer_addr, bcast, 6);
     bcastPeer.channel = 0;
     bcastPeer.encrypt = false;
-    esp_now_add_peer(&bcastPeer);
+    esp_err_t addPeerResult = esp_now_add_peer(&bcastPeer);
+    Serial.printf("[ESPNOW] Added broadcast peer: result=%d\n", addPeerResult);
     
     Serial.println("[ESP32#2] Ready — waiting for slaves and UART packets");
 }

@@ -5,7 +5,7 @@
 //    Header (1 byte, always present)
 //      uint8_t  msgType
 //    Payload (union, only as large as needed)
-//      RegisterPayload  : name(16) + nodeId(1)  -> 17 bytes
+//      RegisterPayload  : name(16)  -> 16 bytes
 //      GamepadState     : raw gamepad state      -> 12 bytes
 //      (ACK / ACTIVATE / DEACTIVATE / ACTIVATE_ACK: no payload)
 //
@@ -36,14 +36,13 @@ enum MsgType : uint8_t {
 
 struct RegisterPayload {
   char    name[NAME_LEN]; // friendly name, null-terminated
-  uint8_t nodeId;         // optional fixed node ID (0 = none)
 };
 
 // ── Full message (union) ─────────────────────────────────────
 struct EspNowMsg {
   uint8_t msgType;          // 1-byte header
   union {
-    RegisterPayload reg;    // 17 bytes  -> MSG_REGISTER
+    RegisterPayload reg;    // 16 bytes  -> MSG_REGISTER
     GamepadState    gamepad; // 12 bytes  -> MSG_GAMEPAD_DATA
     // all other types: no payload
   } payload;
@@ -55,7 +54,7 @@ struct EspNowMsg {
 // Always pass msgSize(type) to esp_now_send() — never sizeof(EspNowMsg)!
 inline size_t msgSize(uint8_t type) {
   switch (type) {
-    case MSG_REGISTER:      return 1 + sizeof(RegisterPayload); // 18 bytes
+    case MSG_REGISTER:      return 1 + sizeof(RegisterPayload); // 17 bytes
     case MSG_GAMEPAD_DATA:  return 1 + sizeof(GamepadState);     // 13 bytes
     case MSG_ACK:
     case MSG_ACTIVATE:
@@ -73,11 +72,10 @@ inline EspNowMsg makeSimple(uint8_t type) {
   return m;
 }
 
-inline EspNowMsg makeRegister(const char *name, uint8_t nodeId = 0) {
+inline EspNowMsg makeRegister(const char *name) {
   EspNowMsg m = {};
   m.msgType = MSG_REGISTER;
   strncpy(m.payload.reg.name, name, NAME_LEN - 1);
-  m.payload.reg.nodeId = nodeId;
   return m;
 }
 
