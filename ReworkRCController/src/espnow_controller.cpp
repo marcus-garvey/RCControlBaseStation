@@ -44,9 +44,20 @@
 #include <Arduino.h>
 #include <esp_now.h>
 #include <WiFi.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
 #include "serial_protocol.h"         // UART frame types + GamepadState + RxParser
 #include "espnow_protocol.h"  // EspNowMsg, MsgType, makeSimple, makeGamepadData, …
 #include "debounced_button.h"
+
+// ── OLED ────────────────────────────────────────────────────
+#define OLED_WIDTH  128
+#define OLED_HEIGHT  64
+#define OLED_RESET   -1
+#define OLED_ADDR   0x3C
+Adafruit_SSD1306 display(OLED_WIDTH, OLED_HEIGHT, &Wire, OLED_RESET);
+static void displayUpdate();
 
 // ── Hardware ─────────────────────────────────────────────────
 static constexpr uint8_t  UART2_TX_PIN          = 17;
@@ -71,6 +82,7 @@ struct Slave {
     char     name[NAME_LEN];
     uint8_t  nodeId;
     uint32_t lastSeen;
+    uint8_t  sendFailCount = 0;
 };
 
 static Slave    slaves[MAX_SLAVES];
@@ -83,6 +95,11 @@ static uint32_t lastLedToggle = 0;
 static bool     waitingForActivateAck = false;
 static uint32_t activateSentAt        = 0;
 static int      pendingSlot           = -1;
+
+// ── Gamepad controller handshake ───────────────────────────────
+static bool     controllerReady       = false;
+static uint32_t readySentAt           = 0;
+static constexpr uint32_t READY_RESEND_MS = 500;
 
 static DebouncedButton button(BUTTON_PIN, 50);
 
@@ -100,12 +117,6 @@ static RxParser gRxFwd;
 
 // ── Player-ID counter (1-4, wraps) ────────────────────────────
 static uint8_t gNextPlayerId = 1;
-static inline uint8_t assignPlayerId() {
-    uint8_t id = gNextPlayerId;
-    gNextPlayerId = static_cast<uint8_t>((gNextPlayerId % 4) + 1);
-    return id;
-}
-
 // =============================================================
 // ESP-NOW slave management  (mirrors reference master code)
 // =============================================================
@@ -217,9 +228,38 @@ static void forwardToSlave(uint8_t pad_id, uint8_t event,
 // =============================================================
 
 static void espnow_send_cb(const uint8_t* mac, esp_now_send_status_t status) {
-    if (status != ESP_NOW_SEND_SUCCESS)
+    // Find slave by MAC address
+    int slot = -1;
+    for (int i = 0; i < slaveCount; i++) {
+        if (memcmp(slaves[i].mac, mac, 6) == 0) {
+            slot = i;
+            break;
+        }
+    }
+
+    if (status != ESP_NOW_SEND_SUCCESS) {
         Serial.printf("[ESPNOW] Send failed -> %02X:%02X:%02X:%02X:%02X:%02X\n",
                       mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+        
+        if (slot >= 0) {
+            slaves[slot].sendFailCount++;
+            Serial.printf("[ESPNOW] Slave '%s' fail count: %d/5\n",
+                          slaves[slot].name, slaves[slot].sendFailCount);
+            
+            // Deregister slave if 5 failures reached
+            if (slaves[slot].sendFailCount >= 5) {
+                Serial.printf("[ESPNOW] Removing unresponsive slave '%s'\n",
+                              slaves[slot].name);
+                removeSlave(slot);
+                if (slaveCount > 0) selectNextSlave();
+            }
+        }
+    } else {
+        // Reset fail count on successful send
+        if (slot >= 0) {
+            slaves[slot].sendFailCount = 0;
+        }
+    }
 }
 
 // Matches ESP_NOW_RECV_CB_ARGS / ESP_NOW_SRC_MAC from espnow_protocol.h
@@ -266,10 +306,16 @@ static void espnow_recv_cb(ESP_NOW_RECV_CB_ARGS,
 // Controller registration (UART side)
 // =============================================================
 
+static void sendControllerReady() {
+    send_frame(Serial2, PKT_CONTROLLER_READY, 0, nullptr, 0);
+    readySentAt = millis();
+    Serial.println("[UART] Sent CONTROLLER_READY");
+}
+
 static void registerController(uint8_t pad_id) {
     if (pad_id >= NUM_SLOTS) return;
 
-    const uint8_t player_id      = assignPlayerId();
+    const uint8_t player_id      = static_cast<uint8_t>(pad_id + 1);
     gSlots[pad_id].player_id     = player_id;
     gSlots[pad_id].last_state_ms = millis();
 
@@ -298,18 +344,76 @@ static void unregisterController(uint8_t pad_id) {
     memset(&gSlots[pad_id].state, 0, sizeof(GamepadState));
 }
 
+static void displayUpdate();
+
+// =============================================================
+// Display implementation
+// =============================================================
+
+static void displayUpdate() {
+    display.clearDisplay();
+    display.setTextColor(SSD1306_WHITE);
+    display.setTextSize(1);
+
+    display.setCursor(0, 0);
+    display.print("ESP-NOW Controller");
+    display.drawLine(0, 9, OLED_WIDTH - 1, 9, SSD1306_WHITE);
+
+    if (!controllerReady) {
+        display.setCursor(0, 14);
+        display.print("Waiting for gamepad...");
+        display.setCursor(0, 24);
+        display.print("Gamepad: not registered");
+    } else if (slaveCount == 0) {
+        display.setCursor(0, 14);
+        display.print("Waiting for slaves...");
+        display.setCursor(0, 24);
+        display.print("Gamepad: registered");
+    } else {
+        display.setCursor(0, 12);
+        display.print("Active: ");
+        display.print(activeSlot >= 0 ? slaves[activeSlot].name : "--");
+        if (waitingForActivateAck) display.print(" ?");
+        display.drawLine(0, 23, OLED_WIDTH - 1, 23, SSD1306_WHITE);
+
+        int y = 26;
+        for (int i = 0; i < NUM_SLOTS && y < 60; i++) {
+            if (gSlots[i].connected) {
+                display.setCursor(0, y);
+                display.printf("Pad%d: #%d", i, gSlots[i].player_id);
+                y += 10;
+            }
+        }
+
+        display.setCursor(0, 56);
+        display.printf("Slaves:%d", slaveCount);
+    }
+    display.display();
+}
+
 // =============================================================
 // Incoming UART packet handler
 // =============================================================
 
 static void handleIncoming(uint8_t type, uint8_t pad_id,
                             uint8_t* data, uint8_t len) {
+    if (!controllerReady && type != PKT_CONTROLLER_READY_ACK) {
+        Serial.printf("[UART] Ignoring type 0x%02X until controller ready\n", type);
+        return;
+    }
+
     if (pad_id >= NUM_SLOTS) {
         Serial.printf("[UART] pad_id %d out of range\n", pad_id);
         return;
     }
 
     switch (type) {
+        case PKT_CONTROLLER_READY_ACK:
+            if (!controllerReady) {
+                controllerReady = true;
+                Serial.println("[UART] Received CONTROLLER_READY_ACK");
+            }
+            break;
 
         case PKT_CONNECT:
             Serial.printf("[UART] CONNECT  slot=%d\n", pad_id);
@@ -408,6 +512,15 @@ void setup() {
     // UART2 to ESP32 #1
     Serial2.begin(UART_BAUD, SERIAL_8N1, UART2_RX_PIN, UART2_TX_PIN);
 
+    // Display setup
+    Wire.begin();
+    if (!display.begin(SSD1306_SWITCHCAPVCC, OLED_ADDR)) {
+        Serial.println("OLED not found!");
+        while (true) delay(100);
+    }
+    display.clearDisplay();
+    display.display();
+
     // ESP-NOW init
     WiFi.mode(WIFI_STA);
     Serial.printf("[ESP32#2] MAC: %s\n", WiFi.macAddress().c_str());
@@ -432,6 +545,9 @@ void setup() {
     // LED setup
     pinMode(LED_PIN, OUTPUT);
     digitalWrite(LED_PIN, LOW);
+
+    displayUpdate();
+    sendControllerReady();
 }
 
 void loop() {
@@ -458,6 +574,11 @@ void loop() {
         if (slaveCount > 0) selectNextSlave();
     }
 
+    // ── Resend ready handshake until controller acknowledges ───
+    if (!controllerReady && millis() - readySentAt >= READY_RESEND_MS) {
+        sendControllerReady();
+    }
+
     // ── Watchdog: detect dead controllers ────────────────────
     static uint32_t lastWdg = 0;
     if (millis() - lastWdg >= 250) {
@@ -470,6 +591,13 @@ void loop() {
     if (millis() - lastDbg >= 2000) {
         printStatus();
         lastDbg = millis();
+    }
+
+    // ── Display update every 500 ms ───────────────────────────
+    static uint32_t lastDisplay = 0;
+    if (millis() - lastDisplay >= 500) {
+        displayUpdate();
+        lastDisplay = millis();
     }
 
     // ── Blink onboard LED (non-blocking) ─────────────────────

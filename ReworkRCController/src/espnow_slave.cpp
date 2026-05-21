@@ -98,7 +98,7 @@ void processData() {
     if (angle < 0) angle = 0;
     if (angle > 180) angle = 180;
     servo.write(angle);
-    Serial.printf("LX=%d -> angle=%d\n", lx, angle);
+    //Serial.printf("LX=%d -> angle=%d\n", lx, angle);
   }
 }
 

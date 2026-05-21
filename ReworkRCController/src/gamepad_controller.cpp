@@ -126,6 +126,16 @@ static void sendState(uint8_t idx, ControllerPtr ctl) {
     send_frame(Serial2, PKT_STATE, idx, s.data, sizeof(s));
 }
 
+static void resendConnectedControllers() {
+    for (int i = 0; i < BP32_MAX_GAMEPADS; i++) {
+        ControllerPtr ctl = gControllers[i];
+        if (ctl == nullptr || !ctl->isConnected()) continue;
+        Serial.printf("[BACK] Resend connected controller slot=%d\n", i);
+        send_frame(Serial2, PKT_CONNECT, static_cast<uint8_t>(i), nullptr, 0);
+        sendState(static_cast<uint8_t>(i), ctl);
+    }
+}
+
 // =============================================================
 // Handle incoming packets from ESP32 #2 (back-channel)
 // =============================================================
@@ -133,6 +143,13 @@ static void sendState(uint8_t idx, ControllerPtr ctl) {
 static void handleBackChannel(uint8_t type, uint8_t pad_id,
                                uint8_t* data, uint8_t len) {
     switch (type) {
+        case PKT_CONTROLLER_READY: {
+            Serial.println("[BACK] CONTROLLER_READY received");
+            send_frame(Serial2, PKT_CONTROLLER_READY_ACK, 0, nullptr, 0);
+            resendConnectedControllers();
+            break;
+        }
+
         case PKT_SET_PLAYER: {
             if (len < 1) return;
             if (pad_id >= BP32_MAX_GAMEPADS) return;

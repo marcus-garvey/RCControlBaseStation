@@ -52,6 +52,8 @@ typedef enum : uint8_t {
     PKT_STATE      = 0x03,   // ESP32#1 → #2  full gamepad state      (GamepadState)
     PKT_PING       = 0x04,   // ESP32#1 → #2  heartbeat               (no payload)
     PKT_SET_PLAYER = 0x05,   // ESP32#2 → #1  set player LED          (SetPlayerPayload)
+    PKT_CONTROLLER_READY     = 0x06,   // ESP32#2 → #1  controller ready request
+    PKT_CONTROLLER_READY_ACK = 0x07,   // ESP32#1 → #2  controller ready ack
 } PktType;
 
 // ── GamepadState  (12 bytes) ──────────────────────────────────
