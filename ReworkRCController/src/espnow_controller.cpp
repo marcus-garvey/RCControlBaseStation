@@ -23,7 +23,8 @@
 //   • Slaves register via MSG_REGISTER (broadcast); master replies MSG_ACK.
 //   • Button on BUTTON_PIN cycles the active slave (ACTIVATE / DEACTIVATE).
 //   • Master sends MSG_ACTIVATE to one slave at a time and waits for
-//     MSG_ACTIVATE_ACK. If no ACK arrives within 2 s the slave is removed.
+//     MSG_ACTIVATE_ACK. If no ACK arrives within 2 s the slave is removed
+//     and the master does not automatically activate the next slave.
 //   • Gamepad state is forwarded to the active slave as MSG_GAMEPAD_DATA
 //     whenever a new PKT_STATE arrives via UART.
 //
