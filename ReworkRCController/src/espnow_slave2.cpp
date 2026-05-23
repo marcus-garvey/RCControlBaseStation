@@ -9,7 +9,6 @@
 //
 //  Set the friendly name here:
 #define DEVICE_NAME    "Test Slave"
-#define DEVICE_NODE_ID  2           // 0 = no ID
 // ============================================================
 
 #include <ESP32Servo.h>
@@ -21,7 +20,7 @@ static constexpr uint8_t LED_TRIANGLE_PIN = 23;
 static constexpr uint8_t SERVO_PIN        = 16;
 
 // ── Global objects ───────────────────────────────────────────
-EspNowRCReceiver gamepad(DEVICE_NODE_ID, DEVICE_NAME);
+EspNowRCReceiver gamepad(DEVICE_NAME);
 Servo servo;
 
 // ── FPS counter (debug) ──────────────────────────────────────

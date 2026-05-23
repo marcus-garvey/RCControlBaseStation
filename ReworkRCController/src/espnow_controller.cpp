@@ -140,14 +140,32 @@ static uint8_t gNextPlayerId = 1;
 static void removeSlave(int slot) {
     Serial.printf("[MASTER] Slave '%s' removed\n", slaves[slot].name);
     esp_now_del_peer(slaves[slot].mac);
+
+    // If removing the currently active slot, clear activeSlot.
     if (slot == activeSlot) activeSlot = -1;
-    // compact array: overwrite with last entry
-    slaves[slot] = slaves[--slaveCount];
-    lastSendType[slot] = lastSendType[slaveCount];
-    sendCallbackSuppressed[slot] = sendCallbackSuppressed[slaveCount];
-    lastSendType[slaveCount] = SEND_NONE;
-    sendCallbackSuppressed[slaveCount] = false;
-    if (activeSlot == slaveCount) activeSlot = slot;
+
+    int last = slaveCount - 1;
+    if (slot != last) {
+        // Move last entry into the removed slot to keep array compact
+        slaves[slot] = slaves[last];
+        lastSendType[slot] = lastSendType[last];
+        sendCallbackSuppressed[slot] = sendCallbackSuppressed[last];
+
+        // If any index pointed to the last entry, update it to the new slot
+        if (activeSlot == last) activeSlot = slot;
+        if (pendingSlot == last) pendingSlot = slot;
+    }
+
+    // Clear the old last entry
+    lastSendType[last] = SEND_NONE;
+    sendCallbackSuppressed[last] = false;
+    slaveCount--;
+
+    // If we removed the pending slot, cancel the pending activation
+    if (pendingSlot == slot) {
+        pendingSlot = -1;
+        waitingForActivateAck = false;
+    }
 }
 
 static void addSlave(const uint8_t* mac, const char* name) {
@@ -201,7 +219,10 @@ static void selectNextSlave() {
     if (slaveCount == 0)       { Serial.println("[MASTER] No slaves"); return; }
     if (waitingForActivateAck) { Serial.println("[MASTER] Waiting for ACK"); return; }
 
-    // deactivate current slave
+    // compute next slot index first (handles activeSlot == -1 correctly)
+    int next = (activeSlot + 1 + slaveCount) % slaveCount;
+
+    // deactivate current slave (if any)
     if (activeSlot >= 0 && activeSlot < slaveCount) {
         EspNowMsg deact = makeSimple(MSG_DEACTIVATE);
         esp_now_send(slaves[activeSlot].mac,
@@ -211,8 +232,8 @@ static void selectNextSlave() {
         activeSlot = -1;
     }
 
-    // advance ring: +slaveCount keeps modulo positive when activeSlot == -1
-    sendActivate((activeSlot + 1 + slaveCount) % slaveCount);
+    // activate computed next slot
+    sendActivate(next);
 }
 
 // =============================================================
@@ -281,7 +302,6 @@ static void espnow_send_cb(const uint8_t* mac, esp_now_send_status_t status) {
             Serial.printf("[ESPNOW] Removing unresponsive slave '%s'\n",
                           slaves[slot].name);
             removeSlave(slot);
-            if (slaveCount > 0) selectNextSlave();
         }
     } else {
         // Reset fail count on successful send
@@ -715,7 +735,6 @@ void loop() {
                       slaves[pendingSlot].name);
         waitingForActivateAck = false;
         removeSlave(pendingSlot);
-        if (slaveCount > 0) selectNextSlave();
     }
 
     // ── Resend ready handshake until controller acknowledges ───

@@ -30,7 +30,7 @@ public:
 
     friend void onEspNowRecv(const uint8_t *mac, const uint8_t *incomingData, int len);
 
-    EspNowRCReceiver(byte devicenum, const char* friendlyName = "EspNowRCReceiver");
+    EspNowRCReceiver(const char* friendlyName = "EspNowRCReceiver");
 
     void begin();
     void update();  // Call this in loop — handles non-blocking registration retry
@@ -107,7 +107,6 @@ private:
     GamepadState last_state;
 
     // ── Device tracking ──────────────────────────────────────
-    byte device;
     char deviceName[32];
     bool _isDeviceActive;
 

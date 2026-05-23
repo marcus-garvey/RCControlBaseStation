@@ -80,9 +80,8 @@ void onEspNowRecv(const uint8_t *mac, const uint8_t *incomingData, int len) {
 // ────────────────────────────────────────────────────────────
 // Constructor
 // ────────────────────────────────────────────────────────────
-EspNowRCReceiver::EspNowRCReceiver(byte devicenum, const char* friendlyName)
+EspNowRCReceiver::EspNowRCReceiver(const char* friendlyName)
 {
-    device = devicenum;
     strncpy(deviceName, friendlyName, sizeof(deviceName) - 1);
     deviceName[sizeof(deviceName) - 1] = '\0';
     memset(cur_state.data, 0, sizeof(GamepadState));
