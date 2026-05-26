@@ -4,7 +4,6 @@
 //
 //  Set the friendly name and optional node ID here:
 #define DEVICE_NAME    "First Slave"
-#define DEVICE_NODE_ID  1           // 0 = no ID
 // ============================================================
 
 #include <esp_now.h>
