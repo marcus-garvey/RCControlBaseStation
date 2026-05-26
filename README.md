@@ -29,7 +29,7 @@ The complete schematic is also available here:
 
 > [!WARNING] 
 > I made a prototyp board for the controller. You can find the Gerber Files [here](PCB/Gerber_PCB_RCControlboard_2026-05-25.zip)\
-> This is an early prototyp so use it at your own risk.
+> This is an early prototyp so use it at your own risk. I will test it and made a box which clips on the controller.
 
 ### Base station
 
@@ -75,3 +75,7 @@ After uploading the firmware, power up the base station, connect the  controller
 Thanks Professor Boots for these amazing models [GithubProfBoots](https://github.com/ProfBoots)
 
 ## TODOs
+* Multiple Controller Support, so you can play with you kids together
+* Printable attachment for a gamepad, so it can hold the board
+* Add more models from Professor Boots (I am not sure whether I will build all :flushed: so I can test them. The wheel-loader and the dozer coming for sure)
+* Maybe support for a bigger display (my eyes bleeding with these 1inch displays)  
