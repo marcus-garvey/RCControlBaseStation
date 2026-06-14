@@ -1,5 +1,5 @@
 // ============================================================
-//  ESP-NOW Slave
+//  ESP-NOW Slave for Protocol Debugging
 //  Requires: espnow_protocol.h in the same folder
 //
 //  Set the friendly name and optional node ID here:
