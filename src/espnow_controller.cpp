@@ -114,6 +114,7 @@ static constexpr uint32_t READY_RESEND_MS = 500;
 static constexpr uint32_t HEARTBEAT_MS = 3000;
 static uint32_t lastHeartbeatSend = 0;
 static constexpr uint32_t DISPLAY_PAGE_CHANGE_MS = 4000;
+static constexpr uint32_t DISPLAY_REFRESH_MS = 75;
 static uint32_t lastDisplayPageChange = 0;
 static uint8_t displayPage = 0;  // 0=Controller, 1=Gamepad, 2=Slaves (for error mode)
                                  // or 0=Status, 1=Active, 2=Gamepads (for ok mode)
@@ -450,6 +451,52 @@ static void displayErrorStatusPage(uint8_t page, bool slotsPresent) {
     }
 }
 
+static constexpr uint32_t SCROLL_STEP_MS = 75;
+static constexpr int16_t SCROLL_GAP_PIXELS = 16;
+static char scrollLineText[64] = {0};
+static int16_t scrollLineOffset = 0;
+static int16_t scrollLineMaxOffset = 0;
+static uint32_t scrollLineLastMove = 0;
+
+static void displayScrollLine(const char* text, int16_t y) {
+    display.setTextSize(2);
+    display.setTextWrap(false);
+    display.setTextColor(SSD1306_WHITE);
+
+    int16_t x1, y1;
+    uint16_t w, h;
+    display.getTextBounds(text, 0, y, &x1, &y1, &w, &h);
+
+    if (w <= OLED_WIDTH) {
+        display.setCursor(0, y);
+        display.print(text);
+        scrollLineOffset = 0;
+        scrollLineMaxOffset = 0;
+        scrollLineText[0] = '\0';
+        return;
+    }
+
+    if (strncmp(scrollLineText, text, sizeof(scrollLineText)) != 0) {
+        strncpy(scrollLineText, text, sizeof(scrollLineText) - 1);
+        scrollLineText[sizeof(scrollLineText) - 1] = '\0';
+        scrollLineOffset = 0;
+        scrollLineMaxOffset = static_cast<int16_t>(w - OLED_WIDTH + SCROLL_GAP_PIXELS);
+        scrollLineLastMove = millis();
+    }
+
+    uint32_t now = millis();
+    if (now - scrollLineLastMove >= SCROLL_STEP_MS) {
+        scrollLineLastMove = now;
+        scrollLineOffset += 1;
+        if (scrollLineOffset > scrollLineMaxOffset) {
+            scrollLineOffset = 0;
+        }
+    }
+
+    display.setCursor(-scrollLineOffset, y);
+    display.print(text);
+}
+
 static void displayUpdate() {
     display.clearDisplay();
     display.setTextColor(SSD1306_WHITE);
@@ -477,7 +524,7 @@ static void displayUpdate() {
         // OK mode: show normal operational pages
         display.setTextSize(1);
         display.setCursor(0, 0);
-        display.print("RC Controller");
+        display.printf("RC Controller (%d)", slaveCount);
         display.drawLine(0, 9, OLED_WIDTH - 1, 9, SSD1306_WHITE);
 
         if (displayPage == 0) {
@@ -485,14 +532,19 @@ static void displayUpdate() {
             display.setTextSize(1);
             display.setCursor(0, 14);
             display.print("Active: ");
-            display.println(activeSlot >= 0 ? slaves[activeSlot].name : "--");
+
+            display.setTextSize(2);
+            char activeText[64];
+            snprintf(activeText, sizeof(activeText), " %s",
+                     (activeSlot >= 0) ? slaves[activeSlot].name : "--");
+            displayScrollLine(activeText, 26);
+
             if (waitingForActivateAck) {
-                display.setCursor(0, 24);
+                display.setTextSize(1);
+                display.setCursor(0, 52);
                 display.println("(Activating...)");
             }
-            display.setCursor(0, 34);
-            display.print("Available Slaves: ");
-            display.println(slaveCount);
+
         } else if (displayPage == 1) {
             // Connected gamepads page
             display.setTextSize(1);
@@ -510,9 +562,9 @@ static void displayUpdate() {
             // Slaves info page
             display.setTextSize(1);
             display.setCursor(0, 14);
-            display.printf("Slaves: %d\n", slaveCount);
+            display.printf("Models: %d\n", slaveCount);
             display.setCursor(0, 24);
-            display.printf("Active: %d\n", activeSlot);
+            display.printf("Active: %s\n", activeSlot >= 0 ? slaves[activeSlot].name : "--");
             display.setCursor(0, 34);
             display.printf("Fail Cnt: %d\n", activeSlot >= 0 ? slaves[activeSlot].sendFailCount : 0);
         }
@@ -763,9 +815,9 @@ void loop() {
         lastDbg = millis();
     }
 
-    // ── Display update every 500 ms ───────────────────────────
+    // ── Display update every DISPLAY_REFRESH_MS ms ────────────
     static uint32_t lastDisplay = 0;
-    if (millis() - lastDisplay >= 500) {
+    if (millis() - lastDisplay >= DISPLAY_REFRESH_MS) {
         displayUpdate();
         lastDisplay = millis();
     }
