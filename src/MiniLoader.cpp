@@ -199,6 +199,12 @@ void stopAll()
     digitalWrite(LT1, LOW);
     digitalWrite(LT2, LOW);
     digitalWrite(LT3, LOW);
+    hazardLT = false;
+    blinkLT = false;
+    lightsOn = false;
+    auxLightsOn = false;
+    hazardsOn = false;  
+    lightMode = 0;
 }
 
 // ── Setup Pin Modes ─────────────────────────────────────────
@@ -232,7 +238,8 @@ void setUpPinModes()
     steeringServo.attach(steeringServoPin);
     steeringServo.write(adjustedSteeringValue);
     attachmentServo.attach(attachmentServoPin);
-    attachmentServo.write(10);
+    attachmentServo.write(115);
+    servoActive = true;
 }
 
 // ── Control Update ──────────────────────────────────────────
@@ -561,6 +568,8 @@ void ctrlBtnPs(bool pressed)
 void devGoingActive()
 {
     Serial.println("Device going active");
+    lightMode = 3;
+    hazardLT = true;
 }
 
 void devGoingInactive()

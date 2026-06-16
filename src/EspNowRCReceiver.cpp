@@ -27,14 +27,11 @@ void onEspNowRecv(const uint8_t *mac, const uint8_t *incomingData, int len) {
             Serial.printf("EspNowRCReceiver: Added master peer: result=%d\n", result);
 
             g_espNowRCReceiverInstance->registered = true;
-            g_espNowRCReceiverInstance->_isDeviceActive = true;
+            g_espNowRCReceiverInstance->_isDeviceActive = false;
             g_espNowRCReceiverInstance->lastHeartbeatAt = millis();
             Serial.println("EspNowRCReceiver: MSG_ACK received, registration complete");
             if (g_espNowRCReceiverInstance->_callback_doneRegistration) {
                 g_espNowRCReceiverInstance->_callback_doneRegistration();
-            }
-            if (g_espNowRCReceiverInstance->_callback_goingActive) {
-                g_espNowRCReceiverInstance->_callback_goingActive();
             }
         }
     }
