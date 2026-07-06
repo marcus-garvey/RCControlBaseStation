@@ -173,7 +173,7 @@ void registrationStart()
 
 void registrationDone()
 {
-  digitalWrite(MCU_LED, HIGH);
+
 }
 
 void setup() {

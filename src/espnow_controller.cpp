@@ -562,11 +562,29 @@ static void displayUpdate() {
             // Slaves info page
             display.setTextSize(1);
             display.setCursor(0, 14);
-            display.printf("Models: %d\n", slaveCount);
-            display.setCursor(0, 24);
-            display.printf("Active: %s\n", activeSlot >= 0 ? slaves[activeSlot].name : "--");
-            display.setCursor(0, 34);
-            display.printf("Fail Cnt: %d\n", activeSlot >= 0 ? slaves[activeSlot].sendFailCount : 0);
+
+            const int maxVisible = 5;
+            const int total = slaveCount;
+            int startIndex = 0;
+            if (total > maxVisible) {
+                static int scrollOffset = 0;
+                static uint32_t lastScrollMs = 0;
+                const uint32_t scrollIntervalMs = 1200;
+
+                if (millis() - lastScrollMs >= scrollIntervalMs) {
+                    lastScrollMs = millis();
+                    scrollOffset = (scrollOffset + 1) % (total - maxVisible + 1);
+                }
+                startIndex = scrollOffset;
+            }
+
+            int y = 14;
+            for (int i = startIndex; i < total && y < 60; i++) {
+                const bool isActive = (activeSlot >= 0 && i == activeSlot);
+                display.setCursor(0, y);
+                display.printf("%s%s", isActive ? "*" : " ", slaves[i].name);
+                y += 8;
+            }
         }
     }
 
@@ -643,8 +661,29 @@ static void handleIncoming(uint8_t type, uint8_t pad_id,
                               len, static_cast<int>(sizeof(GamepadState)));
                 break;
             }
-            memcpy(gSlots[pad_id].state.data, data, sizeof(GamepadState));
-            gSlots[pad_id].last_state_ms = millis();
+            // Preserve previous PS (system) button state for edge detection
+            bool prev_ps = false;
+            if (pad_id < NUM_SLOTS) prev_ps = gSlots[pad_id].state.part.btn_system;
+
+            GamepadState incomingState;
+            memcpy(incomingState.data, data, sizeof(GamepadState));
+
+            // Update stored state and timestamp
+            if (pad_id < NUM_SLOTS) {
+                gSlots[pad_id].state = incomingState;
+                gSlots[pad_id].last_state_ms = millis();
+            }
+
+            // PS button (btn_system) rising edge -> cycle active slave
+            static uint32_t lastPsPressMs = 0;
+            if (!prev_ps && incomingState.part.btn_system) {
+                uint32_t now = millis();
+                if (now - lastPsPressMs > 300) { // simple debounce
+                    Serial.println("[INPUT] PS pressed -> cycling slave");
+                    selectNextSlave();
+                    lastPsPressMs = now;
+                }
+            }
 
             // Forward to active slave as MSG_GAMEPAD_DATA (event=0)
             forwardToSlave(pad_id, 0, &gSlots[pad_id].state);
